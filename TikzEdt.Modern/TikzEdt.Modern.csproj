@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Branding\TikzEdt.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\Branding\TikzEdt.ico" />
+    <ProjectReference Include="..\TikzEdt.Modern.Core\TikzEdt.Modern.Core.csproj" />
+    <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
+    <ProjectReference Include="..\Dependencies\TikzParser\TikzParser.csproj" />
+    <Reference Include="Antlr3.Runtime"><HintPath>..\Dependencies\ParserRuntime\Antlr3.Runtime.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="Antlr3.Utility"><HintPath>..\Dependencies\ParserRuntime\Antlr3.Utility.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="antlr.runtime"><HintPath>..\Dependencies\ParserRuntime\antlr.runtime.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="StringTemplate"><HintPath>..\Dependencies\ParserRuntime\StringTemplate.dll</HintPath><Private>true</Private></Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assets\Editor\TikzSyntax.xshd" Link="TikzSyntax.xshd" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Editor\TheSnippets.xml" Link="TheSnippets.xml" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="CircuitikzCatalog.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="CircuitikzCatalog.README.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

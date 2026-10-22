@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>TikzParser</AssemblyName>
+    <RootNamespace>TikzEdt.Parser</RootNamespace>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- Keep the inherited/generated parser unchanged; suppress its generated-code warnings. -->
+    <NoWarn>$(NoWarn);1591;1587;1572;1573;0219;CA2200</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Antlr3.Runtime"><HintPath>..\ParserRuntime\Antlr3.Runtime.dll</HintPath></Reference>
+    <Reference Include="Antlr3.Utility"><HintPath>..\ParserRuntime\Antlr3.Utility.dll</HintPath></Reference>
+    <Reference Include="antlr.runtime"><HintPath>..\ParserRuntime\antlr.runtime.dll</HintPath></Reference>
+    <Reference Include="StringTemplate"><HintPath>..\ParserRuntime\StringTemplate.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

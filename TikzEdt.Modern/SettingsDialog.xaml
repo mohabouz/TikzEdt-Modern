@@ -1,0 +1,90 @@
+<Window x:Class="TikzEdt.Modern.SettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:avalon="http://icsharpcode.net/sharpdevelop/avalonedit"
+        Title="Settings" Width="820" Height="740" MinWidth="700" MinHeight="580"
+        Style="{StaticResource {x:Type Window}}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Window.BindingGroup><BindingGroup/></Window.BindingGroup>
+    <Window.Resources>
+        <Style x:Key="Field" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Padding" Value="7,5"/><Setter Property="Margin" Value="0,3,0,9"/>
+        </Style>
+        <Style x:Key="Option" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}"><Setter Property="Margin" Value="0,5"/></Style>
+    </Window.Resources>
+    <Grid Margin="18">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,14"/>
+        <TabControl Grid.Row="1">
+            <TabItem Header="Editor">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="12">
+                    <TextBlock Text="Font family"/>
+                    <ComboBox x:Name="FontSelector" Margin="0,3,0,9" MinHeight="36"
+                              ItemsSource="{Binding EditorFonts, RelativeSource={RelativeSource AncestorType=Window}}"
+                              SelectedValuePath="Source" SelectedValue="{Binding EditorFont, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              IsTextSearchEnabled="True" TextSearch.TextPath="Source"
+                              ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                              SelectionChanged="EditorAppearance_Changed" ToolTip="Installed fonts. Type a font name to jump to it.">
+                        <ComboBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ComboBox.ItemsPanel>
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid MinHeight="26">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="200"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Source}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,16,0"/>
+                                    <TextBlock Grid.Column="1" Text="Aa Bb 0123 → ∑" FontFamily="{Binding}" FontSize="17" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <TextBlock Text="Font size"/><TextBox x:Name="FontSizeField" Style="{StaticResource Field}" Text="{Binding EditorFontSize}" TextChanged="EditorAppearance_Changed"/>
+                    <TextBlock Text="Editor color style"/>
+                    <ComboBox x:Name="StyleSelector" Margin="0,5,0,9" SelectedValuePath="Content" SelectedValue="{Binding EditorStyle}" SelectionChanged="EditorAppearance_Changed">
+                        <ComboBoxItem>Dark</ComboBoxItem><ComboBoxItem>Light</ComboBoxItem><ComboBoxItem>High contrast</ComboBoxItem>
+                    </ComboBox>
+                    <TextBlock Text="Live editor preview" Margin="0,8,0,5" Foreground="{StaticResource MutedBrush}"/>
+                    <avalon:TextEditor x:Name="FontPreview" Height="115" IsReadOnly="True" Padding="10" Text="\begin{tikzpicture}&#10;    \draw[blue,thick] (0,0) rectangle (4,2);&#10;\end{tikzpicture}"/>
+                    <Button Content="Refresh editor preview" HorizontalAlignment="Left" Click="PreviewStyle_Click"/>
+                    <CheckBox Style="{StaticResource Option}" Content="Show line numbers" IsChecked="{Binding ShowLineNumbers}"/>
+                    <CheckBox Style="{StaticResource Option}" Content="Wrap long lines" IsChecked="{Binding WordWrap}"/>
+                    <CheckBox Style="{StaticResource Option}" Content="Highlight current line" IsChecked="{Binding HighlightCurrentLine}"/>
+                    <CheckBox Style="{StaticResource Option}" Content="Syntax highlighting" IsChecked="{Binding SyntaxHighlighting}"/>
+                    <CheckBox Style="{StaticResource Option}" Content="Show completion while typing (Ctrl+Space remains available)" IsChecked="{Binding AutomaticCompletion}"/>
+                    <CheckBox Style="{StaticResource Option}" Content="Convert tabs to spaces" IsChecked="{Binding ConvertTabsToSpaces}"/>
+                    <TextBlock Text="Tab size" Margin="0,8,0,0"/><TextBox Style="{StaticResource Field}" Text="{Binding TabSize}"/>
+                </StackPanel></ScrollViewer>
+            </TabItem>
+            <TabItem Header="Compiler">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="12">
+                    <TextBlock Text="Default engine"/>
+                    <ComboBox Margin="0,5,0,9" SelectedValuePath="Tag" SelectedValue="{Binding DefaultEngine}"><ComboBoxItem Tag="pdflatex">pdfLaTeX</ComboBoxItem><ComboBoxItem Tag="lualatex">LuaLaTeX</ComboBoxItem><ComboBoxItem Tag="xelatex">XeLaTeX</ComboBoxItem></ComboBox>
+                    <TextBlock Text="pdfLaTeX executable"/><TextBox Style="{StaticResource Field}" Text="{Binding PdfLatexPath}"/>
+                    <TextBlock Text="LuaLaTeX executable"/><TextBox Style="{StaticResource Field}" Text="{Binding LuaLatexPath}"/>
+                    <TextBlock Text="XeLaTeX executable"/><TextBox Style="{StaticResource Field}" Text="{Binding XeLatexPath}"/>
+                    <TextBlock Text="Additional compiler flags"/><TextBox Style="{StaticResource Field}" Text="{Binding CompilerFlags}"/>
+                    <TextBlock Text="For example: -synctex=1 -shell-escape. Quote values containing spaces. Preview output paths, format and interaction mode are managed by TikzEdt." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+                    <TextBlock Text="Compilation timeout (seconds)"/><TextBox Style="{StaticResource Field}" Text="{Binding CompilerTimeoutSeconds}"/>
+                    <TextBlock Text="Snippet preview timeout (seconds)"/><TextBox Style="{StaticResource Field}" Text="{Binding SnippetTimeoutSeconds}"/>
+                    <CheckBox Style="{StaticResource Option}" Content="Use fast precompiled headers for pdfLaTeX" IsChecked="{Binding UsePrecompiledFormats}"/>
+                    <CheckBox Style="{StaticResource Option}" Content="Automatically compile after source edits" IsChecked="{Binding AutomaticPreview}"/>
+                    <TextBlock Text="Automatic preview delay (milliseconds)" Margin="0,8,0,0"/><TextBox Style="{StaticResource Field}" Text="{Binding PreviewDelayMs}"/>
+                    <TextBlock Text="Preview raster quality (DPI at 100% zoom)"/><TextBox Style="{StaticResource Field}" Text="{Binding PreviewDpi}"/>
+                </StackPanel></ScrollViewer>
+            </TabItem>
+            <TabItem Header="Canvas">
+                <StackPanel Margin="12">
+                    <TextBlock Text="Coordinate system"/>
+                    <ComboBox Margin="0,5,0,12" SelectedValuePath="Content" SelectedValue="{Binding CoordinateSystem}"><ComboBoxItem>Auto</ComboBoxItem><ComboBoxItem>Cartesian</ComboBoxItem><ComboBoxItem>Polar</ComboBoxItem></ComboBox>
+                    <TextBlock Text="Auto follows the coordinate under the caret or mouse. Choose Cartesian or Polar to keep a fixed grid and snapping system." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12"/>
+                    <TextBlock Text="Grid spacing"/>
+                    <ComboBox Margin="0,5,0,12" SelectedValuePath="Tag" SelectedValue="{Binding GridStep}"><ComboBoxItem Tag="0.1">0.1</ComboBoxItem><ComboBoxItem Tag="0.2">0.2</ComboBoxItem><ComboBoxItem Tag="0.5">0.5</ComboBoxItem><ComboBoxItem Tag="1">1</ComboBoxItem></ComboBox>
+                    <CheckBox Style="{StaticResource Option}" Content="Show grid" IsChecked="{Binding ShowGrid}"/>
+                    <CheckBox Style="{StaticResource Option}" Content="Snap to grid" IsChecked="{Binding SnapToGrid}"/>
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+        <TextBlock x:Name="ErrorText" Grid.Row="2" Foreground="#FF8B8B" TextWrapping="Wrap" Margin="0,10,0,3"/>
+        <DockPanel Grid.Row="3" Margin="0,8,0,0">
+            <Button DockPanel.Dock="Left" Content="Restore defaults" HorizontalAlignment="Left" Click="Defaults_Click"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Cancel" IsCancel="True"/><Button Content="Save settings" Style="{StaticResource PrimaryButton}" IsDefault="True" Click="Save_Click"/></StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

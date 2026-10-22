@@ -1,0 +1,25 @@
+TikzEdt Modern - Preview release
+
+This installer includes the .NET desktop runtime for Windows x64.
+You do not need to install .NET separately.
+
+TeX is NOT bundled. For compilation, install MiKTeX or TeX Live with TikZ/PGF
+and any packages used by your figures. Make the following commands available
+on PATH (or configure the compiler executable paths in TikzEdt settings):
+
+  pdflatex / lualatex / xelatex: select the engine suitable for your preamble
+  pdftocairo: PDF-to-PNG previews and SVG export
+  pdfinfo: multi-page snippet preview validation
+
+MiKTeX provides these PDF utilities; alternatively use Poppler tools on PATH.
+CircuiTikZ snippets require the circuitikz package. Other snippets may need
+additional packages/libraries. Preambles using fontspec or polyglossia require
+LuaLaTeX or XeLaTeX, not pdfLaTeX. Install any fonts named in your preamble.
+
+This is a development preview, not a signed production release. Windows may
+display an unknown-publisher or SmartScreen warning for the unsigned setup.
+
+Installation is for the current user and does not request administrator rights.
+The default location is LocalAppData\Programs\TikzEdt Modern.
+Uninstalling removes the installed application, but keeps your documents,
+preferences, preamble files and cached previews.

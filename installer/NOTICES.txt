@@ -1,0 +1,28 @@
+TikzEdt Modern
+
+This is a modified modernization/preview build of the TikzEdt project.
+The existing project's GNU General Public License v3 text is included in
+LICENSE.txt. Original contributor attribution remains in the source headers;
+the original project's history is available upstream. This installer is not
+a TeX distribution.
+
+Included components:
+  TikzEdt Modern and Modern.Core
+  TikzEdt legacy TikzParser
+  ICSharpCode.AvalonEdit
+  ANTLR 2/3 runtimes and ANTLR 3 utility
+  StringTemplate
+  Microsoft .NET and Windows Desktop runtime (self-contained deployment)
+
+These components retain their respective copyrights and licenses. Upstream
+projects and source references:
+  https://github.com/mkantem/tikzedt
+  https://github.com/icsharpcode/AvalonEdit
+  https://www.antlr2.org/
+  https://www.antlr3.org/
+  https://www.stringtemplate.org/
+  https://github.com/dotnet/runtime
+  https://github.com/dotnet/wpf
+
+CircuiTikZ catalogue provenance is documented in CircuitikzCatalog.README.md.
+TeX packages, PDF command-line utilities and user fonts are not bundled.

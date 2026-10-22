@@ -1,0 +1,51 @@
+# Modern-only repository. Legacy applications stay on the local backup branch.
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/TikzEdt.Modern.slnx
+!/TikzEdt.Modern/
+!/TikzEdt.Modern.Core/
+!/Dependencies/
+!/tools/
+!/installer/
+!/.codex-smoke/
+!/DRAWING_TOOLS.md
+!/PREVIEW_PERFORMANCE.md
+!/SNIPPET_PREVIEW_CACHE.md
+
+# Build outputs and installer payloads
+[Bb]in/
+[Oo]bj/
+/artifacts/
+*.pdb
+*.user
+*.suo
+/UpgradeLog*.htm
+/UpgradeLog*.xml
+/temp_header.fmt
+
+# Local IDE, agent and tool state
+.vs/
+.vscode/
+.idea/
+.codex/
+.agents/
+.codex-tools/
+
+# Keep regression sources, not their output, logs or local caches
+/.codex-smoke/*
+!/.codex-smoke/*.cs
+!/.codex-smoke/*.csproj
+!/.codex-smoke/*.tikz
+
+# Credentials and machine-local configuration
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+*.pem
+*.log
+*.tmp

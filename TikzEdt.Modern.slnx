@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="TikzEdt.Modern/TikzEdt.Modern.csproj" />
+  <Project Path="TikzEdt.Modern.Core/TikzEdt.Modern.Core.csproj" />
+  <Folder Name="/Dependencies/">
+    <Project Path="Dependencies/TikzParser/TikzParser.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path=".codex-smoke/PreambleSmoke.csproj" />
+  </Folder>
+</Solution>
