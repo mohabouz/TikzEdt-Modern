@@ -83,7 +83,7 @@ internal static class ChemfigStereoRegression
         var canvasPairs = (Canvas)Field(pairs, "_canvas");
         if (canvasPairs.Children.OfType<FrameworkElement>().Count(c => Equals(c.Tag, "lone-pair")) != 6) throw new Exception("Lone dot/line pairs are not drawn as native vectors.");
         var bitmap = new RenderTargetBitmap(1080, 670, 96, 96, PixelFormats.Pbgra32); bitmap.Render(content);
-        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); Directory.CreateDirectory(".codex-smoke/chemfig-stereo-tests"); using (var output = File.Create(".codex-smoke/chemfig-stereo-tests/editor.png")) encoder.Save(output);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); Directory.CreateDirectory("tests/TikzEdt.RegressionTests/chemfig-stereo-tests"); using (var output = File.Create("tests/TikzEdt.RegressionTests/chemfig-stereo-tests/editor.png")) encoder.Save(output);
         pairs.Close(); app.Shutdown();
     }
     public static async Task IntegrationAsync()
@@ -99,7 +99,7 @@ internal static class ChemfigStereoRegression
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(90));
             var result = await TexVectorRenderer.RenderAsync(source, engine, null, "", timeout.Token, new UserSettings());
             if (result.ExitCode != 0 || result.Image is null) throw new Exception(engine + ": " + result.Log);
-            Directory.CreateDirectory(".codex-smoke/chemfig-stereo-tests"); File.Copy(result.SvgPath, ".codex-smoke/chemfig-stereo-tests/" + engine + ".svg", true);
+            Directory.CreateDirectory("tests/TikzEdt.RegressionTests/chemfig-stereo-tests"); File.Copy(result.SvgPath, "tests/TikzEdt.RegressionTests/chemfig-stereo-tests/" + engine + ".svg", true);
             Console.WriteLine(engine + ": nine Cram/in-plane styles, dot/line lone pairs and stereobond ring closure compile as vectors.");
         }
     }

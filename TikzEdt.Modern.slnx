@@ -5,6 +5,6 @@
     <Project Path="Dependencies/TikzParser/TikzParser.csproj" />
   </Folder>
   <Folder Name="/Tests/">
-    <Project Path=".codex-smoke/PreambleSmoke.csproj" />
+    <Project Path="tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj" />
   </Folder>
 </Solution>

@@ -19,7 +19,7 @@ internal static class SnippetBatchRegression
         SnippetPreviewConfiguration.Validate("lualatex", preamble, settings);
         SnippetPreviewConfiguration.Validate("xelatex", preamble, settings);
         SnippetPreviewConfiguration.Validate("pdflatex", new(null, "% \\usepackage{fontspec}\n\\usepackage{amsmath}"), settings);
-        var directory = Path.GetFullPath(Path.Combine(".codex-smoke", "batch-tests", Guid.NewGuid().ToString("N")));
+        var directory = Path.GetFullPath(Path.Combine("tests/TikzEdt.RegressionTests", "batch-tests", Guid.NewGuid().ToString("N")));
         var renders = 0;
         var probes = 0;
         Task<string> Render(SnippetItem item, string engine, PreambleSnapshot snapshot, UserSettings preferences, CancellationToken token)
@@ -90,7 +90,7 @@ internal static class SnippetBatchRegression
         };
         foreach (var engine in new[] { "pdflatex", "lualatex", "xelatex" })
         {
-            var folder = Path.GetFullPath(Path.Combine(".codex-smoke", "batch-tests", runId, engine));
+            var folder = Path.GetFullPath(Path.Combine("tests/TikzEdt.RegressionTests", "batch-tests", runId, engine));
             var batch = new SnippetPreviewBatch(folder, SnippetLibrary.RenderPreviewAsync, SnippetLibrary.GetCachePath, SnippetLibrary.RenderPreviewPagesAsync);
             SnippetBatchProgress? last = null;
             var progress = new ImmediateProgress(value => last = value);
@@ -115,7 +115,7 @@ internal static class SnippetBatchRegression
 
     public static async Task RunAsync()
     {
-        var directory = Path.GetFullPath(Path.Combine(".codex-smoke", "batch-tests", Guid.NewGuid().ToString("N")));
+        var directory = Path.GetFullPath(Path.Combine("tests/TikzEdt.RegressionTests", "batch-tests", Guid.NewGuid().ToString("N")));
         Directory.CreateDirectory(directory);
         var items = new[] { "first", "interrupted", "broken", "last" }
             .Select(name => new SnippetItem { Name = name, Sample = name }).ToArray();
@@ -191,7 +191,7 @@ internal static class SnippetBatchRegression
 
     private static async Task RunChunkResumeAsync()
     {
-        var directory = Path.GetFullPath(Path.Combine(".codex-smoke", "batch-tests", Guid.NewGuid().ToString("N")));
+        var directory = Path.GetFullPath(Path.Combine("tests/TikzEdt.RegressionTests", "batch-tests", Guid.NewGuid().ToString("N")));
         var items = Enumerable.Range(1, 33).Select(index => new SnippetItem { Name = index.ToString() }).ToArray();
         var groupSizes = new List<int>();
         string CachePath(SnippetItem item, string engine, PreambleSnapshot preamble, UserSettings settings) => Path.Combine(directory, item.Name + ".png");

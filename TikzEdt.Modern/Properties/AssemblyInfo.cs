@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("PreambleSmoke")]
+[assembly: InternalsVisibleTo("TikzEdt.RegressionTests")]

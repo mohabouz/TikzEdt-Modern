@@ -198,7 +198,7 @@ if (args.Contains("--drawing-tools"))
 if (args.Contains("--library-alignment"))
 {
     const string libraries = "\\usetikzlibrary{patterns, arrows.meta, calc, positioning, decorations.pathreplacing, shapes.geometric}";
-    var fixture = await File.ReadAllTextAsync(".codex-smoke/library-alignment.tikz");
+    var fixture = await File.ReadAllTextAsync("tests/TikzEdt.RegressionTests/library-alignment.tikz");
     var picture = fixture[fixture.IndexOf("\\begin{tikzpicture}", StringComparison.Ordinal)..];
     foreach (var engine in new[] { "pdflatex", "lualatex", "xelatex" })
     {
@@ -737,7 +737,7 @@ if (args.Contains("--ui-construction"))
                 bitmap.Render(visual);
                 var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
                 encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
-                using var output = File.Create(".codex-smoke/ui-workspace.png"); encoder.Save(output);
+                using var output = File.Create("tests/TikzEdt.RegressionTests/ui-workspace.png"); encoder.Save(output);
             }
             var footerControls = new[] { "ZoomSlider", "GridToggle", "GridStepSelector", "CoordinateSystemSelector" }
                 .Select(name => (System.Windows.FrameworkElement)main.FindName(name)).ToArray();

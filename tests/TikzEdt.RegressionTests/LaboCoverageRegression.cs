@@ -66,7 +66,7 @@ internal static class LaboCoverageRegression
         using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(300));var settings=new UserSettings();
         var result=await TexVectorRenderer.RenderAsync(LaboScene.BuildDocument(variants),"lualatex",null,null,timeout.Token,settings);
         Check(result.Image is not null,"Catalogue/property compilation failed: "+result.Log);
-        Directory.CreateDirectory(".codex-smoke/labo-coverage");File.Copy(result.SvgPath,".codex-smoke/labo-coverage/catalog.svg",true);
+        Directory.CreateDirectory("tests/TikzEdt.RegressionTests/labo-coverage");File.Copy(result.SvgPath,"tests/TikzEdt.RegressionTests/labo-coverage/catalog.svg",true);
         var first=LaboScene.Create("separation",0,0);first.Options["aspectLiquide1"]="Custom";first.Options["$color1"]="FF0000";first.Options["aspectLiquide2"]="Custom";first.Options["$color2"]="0000FF";
         var second=LaboScene.Create("tube",10,0);
         var assets=new Dictionary<string,DrawingImage>();var items=new List<LaboItem>();var sizes=new Dictionary<string,LaboBox>();
@@ -80,7 +80,7 @@ internal static class LaboCoverageRegression
         var scene=new LaboScene {Items=items};scene.Tubes.Add(new(new(first.Id,"top",0,0),new(second.Id,"top",0,0),"Elbow") {ControlY=24});
         scene.Tubes.Add(new(new(null,"custom",2,-2),new(null,"custom",12,-2),"Curve") {ControlY=-5});
         var assembled=await TexVectorRenderer.RenderAsync(scene.ToDocument(),"lualatex",null,null,timeout.Token,settings);Check(assembled.Image is not null,assembled.Log);
-        File.Copy(assembled.SvgPath,".codex-smoke/labo-coverage/assembly.svg",true);
+        File.Copy(assembled.SvgPath,"tests/TikzEdt.RegressionTests/labo-coverage/assembly.svg",true);
         Check(!File.ReadAllText(assembled.SvgPath).Contains("<image"),"Assembly contains raster images.");
         Exception? failure=null;var thread=new Thread(()=>
         {
@@ -89,8 +89,8 @@ internal static class LaboCoverageRegression
                 var app=new App();app.InitializeComponent();var editor=new LaboEditorWindow(scene);var cache=(Dictionary<string,DrawingImage>)Field(editor,"_images");foreach(var asset in assets)cache[asset.Key]=asset.Value;
                 ((HashSet<int>)Field(editor,"_selected")).Add(0);editor.GetType().GetMethod("Properties",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(editor,null);
                 var content=(FrameworkElement)editor.Content;content.Measure(new Size(1250,800));content.Arrange(new Rect(0,0,1250,800));content.UpdateLayout();editor.GetType().GetMethod("Fit",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(editor,null);content.UpdateLayout();
-                Save(content,".codex-smoke/labo-coverage/editor.png",1250,800);editor.Close();
-                var view=new Border {Background=Brushes.White,Width=1100,Height=1000,Child=new Image {Source=assembled.Image,Stretch=Stretch.Uniform}};view.Measure(new Size(1100,1000));view.Arrange(new Rect(0,0,1100,1000));view.UpdateLayout();Save(view,".codex-smoke/labo-coverage/preview.png",1100,1000);app.Shutdown();
+                Save(content,"tests/TikzEdt.RegressionTests/labo-coverage/editor.png",1250,800);editor.Close();
+                var view=new Border {Background=Brushes.White,Width=1100,Height=1000,Child=new Image {Source=assembled.Image,Stretch=Stretch.Uniform}};view.Measure(new Size(1100,1000));view.Arrange(new Rect(0,0,1100,1000));view.UpdateLayout();Save(view,"tests/TikzEdt.RegressionTests/labo-coverage/preview.png",1100,1000);app.Shutdown();
             }catch(Exception e){failure=e;}
         });thread.SetApartmentState(ApartmentState.STA);thread.Start();thread.Join();if(failure is not null)throw failure;
         Console.WriteLine($"{LaboScene.Catalog.Count} apparatus/parts + all 39 native property variants compiled. Cropped independent-phase assets and attached/curved tubing compiled and loaded as vectors.");

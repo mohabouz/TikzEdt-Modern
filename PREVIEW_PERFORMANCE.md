@@ -31,12 +31,12 @@ Other changes:
 Verification commands:
 
 ```powershell
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --preview-benchmark --uncached
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --preview-benchmark
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --preview-cache-regression
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --selection-regression
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --drag-regression
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --ui-construction
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --preview-benchmark --uncached
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --preview-benchmark
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --preview-cache-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --selection-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --drag-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --ui-construction
 ```
 
 Cache regression checks include reuse, changed `\\input` contents, DPI and flag

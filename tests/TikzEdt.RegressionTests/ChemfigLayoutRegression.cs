@@ -86,7 +86,7 @@ internal static class ChemfigLayoutRegression
         Require(window.Result.Contains("NH_2"), "Group dropdown must insert the chosen label.");
         window.GetType().GetMethod("Undo", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
         Named<RadioButton>("Select").IsChecked = true;
-        Directory.CreateDirectory(".codex-smoke/chemfig-layout");
+        Directory.CreateDirectory("tests/TikzEdt.RegressionTests/chemfig-layout");
         foreach (var size in new[] { (1056, 637), (876, 477) })
         {
             Layout(size.Item1, size.Item2);
@@ -99,7 +99,7 @@ internal static class ChemfigLayoutRegression
             Require(editor.HandButton.Visibility == Visibility.Collapsed && preview.FitButton.Visibility == Visibility.Collapsed, "Duplicate navigation controls remain.");
             var bitmap = new RenderTargetBitmap(size.Item1, size.Item2, 96, 96, PixelFormats.Pbgra32); bitmap.Render(root);
             var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            using var stream = File.Create($".codex-smoke/chemfig-layout/{size.Item1}.png"); encoder.Save(stream);
+            using var stream = File.Create($"tests/TikzEdt.RegressionTests/chemfig-layout/{size.Item1}.png"); encoder.Save(stream);
         }
         window.Close(); app.Shutdown();
     }

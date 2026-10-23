@@ -111,10 +111,10 @@ internal static class ChemfigRegression
         var resultBefore = editor.Result;
         var themedSource = ChemfigEditorWindow.BuildPreviewSource(resultBefore, ink);
         if (!themedSource.Contains("\\color[RGB]{223,225,229}") || editor.Result != resultBefore || editor.Result.Contains("\\color")) throw new Exception("Preview theme changed the exported molecule.");
-        var sample = Path.GetFullPath(".codex-smoke/vector-tests/pdflatex.svg");
+        var sample = Path.GetFullPath("tests/TikzEdt.RegressionTests/vector-tests/pdflatex.svg");
         if (File.Exists(sample)) ((Image)typeof(ChemfigEditorWindow).GetField("_preview", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(editor)!).Source = TexVectorRenderer.LoadAsync(sample, CancellationToken.None).GetAwaiter().GetResult();
         var content = (FrameworkElement)editor.Content; content.Measure(new Size(1056, 630)); content.Arrange(new Rect(0, 0, 1056, 630)); content.UpdateLayout();
-        var folder = Path.GetFullPath(".codex-smoke/chemfig-tests"); Directory.CreateDirectory(folder);
+        var folder = Path.GetFullPath("tests/TikzEdt.RegressionTests/chemfig-tests"); Directory.CreateDirectory(folder);
         var bitmap = new RenderTargetBitmap(1080, 660, 96, 96, PixelFormats.Pbgra32); bitmap.Render(content);
         var path = Path.Combine(folder, "editor.png"); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); using (var stream = File.Create(path)) encoder.Save(stream);
         var loaded = PreviewImageLoader.LoadAsync(path, CancellationToken.None).GetAwaiter().GetResult();
@@ -220,7 +220,7 @@ internal static class ChemfigRegression
                         opaque++; if (pixels[i] > 180 && pixels[i + 1] > 180 && pixels[i + 2] > 180) bright++;
                     }
                     if (opaque < 10 || bright < opaque * .95 || transparent < pixels.Length / 8) throw new Exception("Dark TeX preview contains black ink or an opaque light background.");
-                    var folder = Path.GetFullPath(".codex-smoke/chemfig-tests"); Directory.CreateDirectory(folder);
+                    var folder = Path.GetFullPath("tests/TikzEdt.RegressionTests/chemfig-tests"); Directory.CreateDirectory(folder);
                     File.Copy(result.PngPath, Path.Combine(folder, "dark-" + engine + ".png"), true);
                 }
             }

@@ -57,7 +57,7 @@ internal static class VectorAlignmentRegression
                 }
                 var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual);
                 var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-                Directory.CreateDirectory(".codex-smoke/vector-tests"); using var output = File.Create(".codex-smoke/vector-tests/alignment-" + engine + ".png"); encoder.Save(output);
+                Directory.CreateDirectory("tests/TikzEdt.RegressionTests/vector-tests"); using var output = File.Create("tests/TikzEdt.RegressionTests/vector-tests/alignment-" + engine + ".png"); encoder.Save(output);
             }
             catch (Exception e) { failure = e; }
         });

@@ -50,10 +50,10 @@ See [installer documentation](installer/README.md),
 ## Regression checks
 
 ```powershell
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --ui-construction
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --selection-regression
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --snippet-batch-regression
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --workspace-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --ui-construction
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --selection-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --snippet-batch-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --workspace-regression
 ```
 
 The original applications, old solutions and unrelated source projects are not
@@ -213,14 +213,14 @@ tiny temporary pixel probe; this is never used as the displayed figure.
 Additional checks:
 
 ```powershell
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --chemfig-regression
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --chemfig-integration
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --vector-regression
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --vector-integration
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --vector-alignment
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --chemfig-stereo-regression
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --chemfig-stereo-integration
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --chemistry-editing-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --chemfig-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --chemfig-integration
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --vector-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --vector-integration
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --vector-alignment
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --chemfig-stereo-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --chemfig-stereo-integration
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --chemistry-editing-regression
 ```
 
 ### Source editing shortcuts
@@ -297,9 +297,9 @@ References: [PST-Labo](https://ctan.org/pkg/pst-labo),
 [LuaPSTricks](https://github.com/zauguin/luapstricks).
 
 ```powershell
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --labo-navigation-regression
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --labo-integration
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --labo-visual-proof
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --labo-coverage-regression
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --labo-coverage-integration
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --labo-navigation-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --labo-integration
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --labo-visual-proof
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --labo-coverage-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --labo-coverage-integration
 ```

@@ -45,7 +45,7 @@ internal static class LaboNavigationRegression
         preview.ZoomAt(new Point(30,70),5); preview.Pan(new Vector(-60,25));
         Require(ReferenceEquals(image.Source,source) && Equals(generation,Field(chem,"_generation")),"Preview navigation regenerated artwork.");
         view.Fit(new Rect(-50,-60,200,160));
-        content.UpdateLayout(); Directory.CreateDirectory(".codex-smoke/labo-tests"); Save(content,".codex-smoke/labo-tests/chemfig-ui.png",1150,740);
+        content.UpdateLayout(); Directory.CreateDirectory("tests/TikzEdt.RegressionTests/labo-tests"); Save(content,"tests/TikzEdt.RegressionTests/labo-tests/chemfig-ui.png",1150,740);
         chem.Close();
         var lab=new LaboEditorWindow(new LaboScene()); lab.Add("erlen"); lab.Add("titration");
         Require(LaboScene.ReadDocument(lab.Result)!.Items.Count==2,"Lab UI insertion failed.");
@@ -59,7 +59,7 @@ internal static class LaboNavigationRegression
         for(var i=0;i<2;i++) Require(Math.Abs(moved.Items[i].X-originalScene.Items[i].X-2)<1e-8 && Math.Abs(moved.Items[i].Y-originalScene.Items[i].Y-1)<1e-8,"Laboratory group translation is not uniform/snapped.");
         lab.GetType().GetMethod("Undo",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(lab,null);
         Require(lab.Result==LaboScene.BuildDocument(originalScene.Items),"Laboratory group movement is not one undo step.");
-        Save(labContent,".codex-smoke/labo-tests/labo-ui.png",1176,730); lab.Close(); app.Shutdown();
+        Save(labContent,"tests/TikzEdt.RegressionTests/labo-tests/labo-ui.png",1176,730); lab.Close(); app.Shutdown();
     }
     static void Save(FrameworkElement element,string path,int width,int height)
     { var bitmap=new RenderTargetBitmap(width,height,96,96,PixelFormats.Pbgra32); bitmap.Render(element); var encoder=new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); using var stream=File.Create(path); encoder.Save(stream); }
@@ -72,7 +72,7 @@ internal static class LaboNavigationRegression
             using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(150));
             var result=await TexVectorRenderer.RenderAsync(source,engine,null,null,timeout.Token,new UserSettings());
             if(result.ExitCode!=0 || result.Image is null) throw new Exception(engine+": "+result.Log);
-            Directory.CreateDirectory(".codex-smoke/labo-tests"); File.Copy(result.SvgPath,".codex-smoke/labo-tests/"+engine+".svg",true); File.Copy(result.PdfPath,".codex-smoke/labo-tests/"+engine+".pdf",true);
+            Directory.CreateDirectory("tests/TikzEdt.RegressionTests/labo-tests"); File.Copy(result.SvgPath,"tests/TikzEdt.RegressionTests/labo-tests/"+engine+".svg",true); File.Copy(result.PdfPath,"tests/TikzEdt.RegressionTests/labo-tests/"+engine+".pdf",true);
             Require(!File.ReadAllText(result.SvgPath).Contains("<image"),"Unexpected raster content in apparatus SVG.");
             Console.WriteLine(engine+": all 15 apparatus types compiled and loaded as native vectors with no embedded raster images.");
         }
@@ -91,7 +91,7 @@ internal static class LaboNavigationRegression
             var result=await TexVectorRenderer.RenderAsync(key,"lualatex",null,null,timeout.Token,new UserSettings());
             Require(result.Image is not null,"Individual apparatus failed: "+result.Log); images[key]=result.Image!;
         }
-        var gallery=await TexVectorRenderer.LoadAsync(System.IO.Path.GetFullPath(".codex-smoke/labo-tests/lualatex.svg"),timeout.Token);
+        var gallery=await TexVectorRenderer.LoadAsync(System.IO.Path.GetFullPath("tests/TikzEdt.RegressionTests/labo-tests/lualatex.svg"),timeout.Token);
         Exception? failure=null;
         var thread=new Thread(()=>
         {
@@ -103,11 +103,11 @@ internal static class LaboNavigationRegression
                 ((Image)Field(chem,"_preview")).Source=wedge.Image;
                 chem.GetType().GetMethod("FitPreview",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(chem,null);
                 chem.GetType().GetMethod("Changed",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(chem,null);
-                content.UpdateLayout(); Save(content,".codex-smoke/labo-tests/wedge-proof.png",1150,740); chem.Close();
+                content.UpdateLayout(); Save(content,"tests/TikzEdt.RegressionTests/labo-tests/wedge-proof.png",1150,740); chem.Close();
                 var lab=new LaboEditorWindow(new LaboScene {Items=items.ToList()}); var cached=(Dictionary<string,DrawingImage>)Field(lab,"_images"); foreach(var entry in images) cached[entry.Key]=entry.Value;
                 var root=(FrameworkElement)lab.Content; root.Measure(new Size(1176,730)); root.Arrange(new Rect(0,0,1176,730)); root.UpdateLayout();
-                lab.GetType().GetMethod("Fit",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(lab,null); root.UpdateLayout(); Save(root,".codex-smoke/labo-tests/labo-ready.png",1176,730); lab.Close();
-                var overview=new Image {Source=gallery,Stretch=Stretch.Uniform,Width=1800,Height=1300}; var paper=new Border {Background=Brushes.White,Child=overview,Width=1800,Height=1300}; paper.Measure(new Size(1800,1300)); paper.Arrange(new Rect(0,0,1800,1300)); paper.UpdateLayout(); Save(paper,".codex-smoke/labo-tests/catalog.png",1800,1300); app.Shutdown();
+                lab.GetType().GetMethod("Fit",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(lab,null); root.UpdateLayout(); Save(root,"tests/TikzEdt.RegressionTests/labo-tests/labo-ready.png",1176,730); lab.Close();
+                var overview=new Image {Source=gallery,Stretch=Stretch.Uniform,Width=1800,Height=1300}; var paper=new Border {Background=Brushes.White,Child=overview,Width=1800,Height=1300}; paper.Measure(new Size(1800,1300)); paper.Arrange(new Rect(0,0,1800,1300)); paper.UpdateLayout(); Save(paper,"tests/TikzEdt.RegressionTests/labo-tests/catalog.png",1800,1300); app.Shutdown();
             }
             catch(Exception e){failure=e;}
         });

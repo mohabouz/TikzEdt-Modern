@@ -56,9 +56,9 @@ indicator for disk-cache hits, and ignore failures from superseded contexts.
 Regression checks:
 
 ```
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --snippet-batch-regression
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --snippet-batch-integration
-dotnet run --project .codex-smoke/PreambleSmoke.csproj -- --snippet-pages
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --snippet-batch-regression
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --snippet-batch-integration
+dotnet run --project tests/TikzEdt.RegressionTests/TikzEdt.RegressionTests.csproj -- --snippet-pages
 ```
 
 The integration check builds two examples with each of pdfLaTeX, LuaLaTeX and

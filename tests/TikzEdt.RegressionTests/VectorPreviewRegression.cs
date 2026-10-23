@@ -11,7 +11,7 @@ internal static class VectorPreviewRegression
 {
     public static async Task RunAsync(bool integration)
     {
-        var folder = Path.GetFullPath(".codex-smoke/vector-tests"); Directory.CreateDirectory(folder);
+        var folder = Path.GetFullPath("tests/TikzEdt.RegressionTests/vector-tests"); Directory.CreateDirectory(folder);
         var sample = Path.Combine(folder, "sample.svg");
         File.WriteAllText(sample, """
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="120pt" height="80pt" viewBox="0 0 120 80">
@@ -70,7 +70,7 @@ internal static class VectorPreviewRegression
         using (var drawing = visual.RenderOpen()) { drawing.DrawRectangle(Brushes.White, null, new Rect(0, 0, width, height)); drawing.DrawImage(image, new Rect(0, 0, width, height)); }
         var snapshot = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); snapshot.Render(visual);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(snapshot));
-        using (var output = File.Create(Path.GetFullPath(".codex-smoke/vector-tests/vector-3x-qa.png"))) encoder.Save(output);
+        using (var output = File.Create(Path.GetFullPath("tests/TikzEdt.RegressionTests/vector-tests/vector-3x-qa.png"))) encoder.Save(output);
         typeof(MainWindow).GetField("_lastPreviewBoundingBox", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(main, new Rect(0, 0, 5, 3));
         typeof(MainWindow).GetMethod("DisplayVectorPreview", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(main, [image, new Rect(0, 0, 5, 3)]);
         var generation = typeof(MainWindow).GetField("_compileGeneration", BindingFlags.Instance | BindingFlags.NonPublic)!;

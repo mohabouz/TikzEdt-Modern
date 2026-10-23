@@ -9,7 +9,7 @@
 !/Dependencies/
 !/tools/
 !/installer/
-!/.codex-smoke/
+!/tests/
 !/DRAWING_TOOLS.md
 !/PREVIEW_PERFORMANCE.md
 !/SNIPPET_PREVIEW_CACHE.md
@@ -34,10 +34,10 @@
 .codex-tools/
 
 # Keep regression sources, not their output, logs or local caches
-/.codex-smoke/*
-!/.codex-smoke/*.cs
-!/.codex-smoke/*.csproj
-!/.codex-smoke/*.tikz
+/tests/TikzEdt.RegressionTests/*
+!/tests/TikzEdt.RegressionTests/*.cs
+!/tests/TikzEdt.RegressionTests/*.csproj
+!/tests/TikzEdt.RegressionTests/*.tikz
 
 # Credentials and machine-local configuration
 .env

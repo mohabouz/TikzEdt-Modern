@@ -107,7 +107,7 @@ internal static class WorkspaceRegression
         var scrollers = Visuals<ScrollViewer>(editor).ToArray();
         if (scrollers.Length == 0) throw new Exception("Editor scrollbar viewer was not found.");
         foreach (var scroller in scrollers) { scroller.ApplyTemplate(); if (scroller.Template.FindName("ScrollBarCorner", scroller) is not Border corner || corner.Background.ToString() != editor.Background.ToString()) throw new Exception("Editor scrollbar corner color does not match its background."); }
-        var outputRoot = Path.GetFullPath(".codex-smoke/workspace-tests"); Directory.CreateDirectory(outputRoot);
+        var outputRoot = Path.GetFullPath("tests/TikzEdt.RegressionTests/workspace-tests"); Directory.CreateDirectory(outputRoot);
         var image = BitmapSource.Create(20, 10, 300, 300, PixelFormats.Bgra32, null, new byte[20 * 10 * 4], 20 * 4);
         foreach (var extension in new[] { ".png", ".jpg", ".tiff", ".bmp" })
         {
