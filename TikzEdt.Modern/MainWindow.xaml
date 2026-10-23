@@ -32,8 +32,8 @@
         </Grid.RowDefinitions>
 
         <Menu Grid.Row="0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
-            <MenuItem Header="_File" Foreground="White"><MenuItem Header="New" InputGestureText="Ctrl+N" Click="New_Click"/><MenuItem Header="Open…" InputGestureText="Ctrl+O" Click="Open_Click"/><Separator/><MenuItem Header="Save" InputGestureText="Ctrl+S" Click="Save_Click"/><MenuItem Header="Save As…" Click="SaveAs_Click"/></MenuItem>
-            <MenuItem Header="_Edit" Foreground="White"><MenuItem Header="Undo" InputGestureText="Ctrl+Z" Click="Undo_Click"/><MenuItem Header="Redo" InputGestureText="Ctrl+Y" Click="Redo_Click"/><Separator/><MenuItem Header="Find…" InputGestureText="Ctrl+F" Command="ApplicationCommands.Find" CommandTarget="{Binding ElementName=Editor}"/></MenuItem>
+            <MenuItem Header="_File" Foreground="White"><MenuItem Header="New" InputGestureText="Ctrl+N" Click="New_Click"/><MenuItem Header="Open…" InputGestureText="Ctrl+O" Click="Open_Click"/><Separator/><MenuItem Header="Save" InputGestureText="Ctrl+S" Click="Save_Click"/><MenuItem Header="Save As…" Click="SaveAs_Click"/><Separator/><MenuItem Header="Export figure…" Click="ExportFigure_Click"/></MenuItem>
+            <MenuItem Header="_Edit" Foreground="White"><MenuItem Header="Undo" InputGestureText="Ctrl+Z" Click="Undo_Click"/><MenuItem Header="Redo" InputGestureText="Ctrl+Y" Click="Redo_Click"/><Separator/><MenuItem Header="Find…" InputGestureText="Ctrl+F" Command="ApplicationCommands.Find"/><MenuItem Header="Replace…" InputGestureText="Ctrl+H" Command="ApplicationCommands.Replace"/></MenuItem>
             <MenuItem Header="_View" Foreground="White"><MenuItem Header="Files sidebar" Click="FilesSidebar_Click"/><MenuItem Header="Snippets sidebar" Click="Snippets_Click"/><Separator/><MenuItem Header="Fold all" InputGestureText="Ctrl+Shift+[" Click="FoldAll_Click"/><MenuItem Header="Unfold all" InputGestureText="Ctrl+Shift+]" Click="UnfoldAll_Click"/></MenuItem>
             <MenuItem Header="_Build" Foreground="White">
                 <MenuItem Header="Compile" InputGestureText="F5" Click="Compile_Click"/><MenuItem Header="Cancel" Click="CancelCompile_Click"/>
@@ -44,7 +44,7 @@
                 <MenuItem Header="Open snippet preview cache folder" Click="OpenSnippetCache_Click"/>
                 <MenuItem x:Name="SnippetBuildStatusMenu" Header="Snippet preview build not started" IsEnabled="False"/>
             </MenuItem>
-            <MenuItem Header="_Tools" Foreground="White"><MenuItem Header="Preamble…" Click="Preamble_Click"/><MenuItem Header="Settings…" Click="Settings_Click"/><MenuItem Header="Snippets…" Click="Snippets_Click"/></MenuItem>
+            <MenuItem Header="_Tools" Foreground="White"><MenuItem Header="Chemfig molecule editor…" Click="Chemfig_Click"/><MenuItem Header="PST-Labo apparatus editor…" Click="Labo_Click"/><Separator/><MenuItem Header="Preamble…" Click="Preamble_Click"/><MenuItem Header="Settings…" Click="Settings_Click"/><MenuItem Header="Snippets…" Click="Snippets_Click"/></MenuItem>
             <MenuItem Header="_Help" Foreground="White"><MenuItem Header="TikZ/PGF Manual"/><MenuItem Header="About"/></MenuItem>
         </Menu>
 
@@ -96,6 +96,7 @@
                 <StackPanel Margin="1,5">
                     <RadioButton x:Name="FilesRailButton" GroupName="SidebarRail" Style="{StaticResource ToolButton}" Width="28" Height="68" Margin="0,2" Padding="3" Click="FilesSidebar_Click" ToolTip="Expand Files sidebar"><TextBlock Text="Files"><TextBlock.LayoutTransform><RotateTransform Angle="-90"/></TextBlock.LayoutTransform></TextBlock></RadioButton>
                     <RadioButton x:Name="SnippetsRailButton" GroupName="SidebarRail" Style="{StaticResource ToolButton}" Width="28" Height="88" Margin="0,2" Padding="3" Click="Snippets_Click" ToolTip="Expand Snippets sidebar"><TextBlock Text="Snippets"><TextBlock.LayoutTransform><RotateTransform Angle="-90"/></TextBlock.LayoutTransform></TextBlock></RadioButton>
+                    <RadioButton x:Name="SymbolsRailButton" GroupName="SidebarRail" Style="{StaticResource ToolButton}" Width="28" Height="88" Margin="0,2" Padding="3" Click="SymbolsSidebar_Click" ToolTip="Expand LaTeX Symbols"><TextBlock Text="Symbols"><TextBlock.LayoutTransform><RotateTransform Angle="-90"/></TextBlock.LayoutTransform></TextBlock></RadioButton>
                 </StackPanel>
             </Border>
             <Border x:Name="SidebarHost" Grid.Column="0" Background="#25262A" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
@@ -127,6 +128,7 @@
                             <WrapPanel Grid.Row="3"><Button x:Name="SidebarInsertCodeButton" Content="Insert code" IsEnabled="False" Click="SidebarInsertCode_Click"/><Button x:Name="SidebarInsertExampleButton" Content="Example" IsEnabled="False" Click="SidebarInsertExample_Click"/><Button Content="Browse…" Click="BrowseSnippets_Click"/></WrapPanel>
                         </Grid>
                     </TabItem>
+                    <TabItem x:Name="SymbolsSidebarTab" Header="Σ Symbols"/>
                 </TabControl>
                 </DockPanel>
             </Border>

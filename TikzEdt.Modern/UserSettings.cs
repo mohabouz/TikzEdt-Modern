@@ -18,6 +18,9 @@ public sealed class UserSettings
     public bool AutomaticPreview { get; set; } = true;
     public int PreviewDelayMs { get; set; } = 150;
     public string DefaultEngine { get; set; } = "pdflatex";
+    public bool RememberLastEngine { get; set; } = true;
+    public string LastUsedEngine { get; set; } = "pdflatex";
+    public string StartupEngine => RememberLastEngine ? LastUsedEngine : DefaultEngine;
     public string PdfLatexPath { get; set; } = "pdflatex";
     public string LuaLatexPath { get; set; } = "lualatex";
     public string XeLatexPath { get; set; } = "xelatex";
@@ -30,6 +33,7 @@ public sealed class UserSettings
     public double GridStep { get; set; } = 0.5;
     public bool ShowGrid { get; set; } = true;
     public bool SnapToGrid { get; set; } = true;
+    public string DefaultLonePairStyle { get; set; } = "Line";
 
     public string ResolveEngine(string engine) => engine switch
     {
@@ -56,8 +60,10 @@ public sealed class UserSettings
         if (new[] { PdfLatexPath, LuaLatexPath, XeLatexPath }.Any(string.IsNullOrWhiteSpace))
             throw new ArgumentException("Enter an executable path or command for each compiler.");
         if (DefaultEngine is not ("pdflatex" or "lualatex" or "xelatex")) throw new ArgumentException("Choose a supported engine.");
+        if (LastUsedEngine is not ("pdflatex" or "lualatex" or "xelatex")) LastUsedEngine = DefaultEngine;
         if (CoordinateSystem is not ("Auto" or "Cartesian" or "Polar")) throw new ArgumentException("Choose Auto, Cartesian, or Polar coordinates.");
         if (GridStep is not (0.1 or 0.2 or 0.5 or 1)) throw new ArgumentException("Choose a grid step of 0.1, 0.2, 0.5, or 1.");
+        if (DefaultLonePairStyle is not ("Line" or "Dots")) throw new ArgumentException("Choose Line or Dots for lone pairs.");
         _ = ParseFlags(CompilerFlags);
     }
 
@@ -109,9 +115,18 @@ internal static class SettingsStore
     {
         try
         {
-            var settings = File.Exists(SettingsPath)
-                ? JsonSerializer.Deserialize<UserSettings>(File.ReadAllText(SettingsPath)) ?? new UserSettings()
+            var json = File.Exists(SettingsPath) ? File.ReadAllText(SettingsPath) : null;
+            var settings = json is not null
+                ? JsonSerializer.Deserialize<UserSettings>(json) ?? new UserSettings()
                 : new UserSettings();
+            // Preferences saved before engine history existed should retain their
+            // configured default on the first upgraded launch.
+            if (json is not null)
+            {
+                using var document = JsonDocument.Parse(json);
+                if (!document.RootElement.TryGetProperty(nameof(UserSettings.LastUsedEngine), out _))
+                    settings.LastUsedEngine = settings.DefaultEngine;
+            }
             settings.Validate();
             return settings;
         }

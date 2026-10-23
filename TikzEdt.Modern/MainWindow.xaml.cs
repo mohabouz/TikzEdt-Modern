@@ -51,9 +51,11 @@ public partial class MainWindow : Window
     private bool _hasCenteredExactPreview;
     private bool _isPolarGrid;
     private string? _gridPresentationKey;
+    private EditorCoordinateFrame _coordinateFrame = EditorCoordinateFrame.Identity;
     private LegacyTikzDiagram? _cachedDiagram;
     private string? _cachedDiagramSource;
     private BitmapSource? _compiledBitmap;
+    private DrawingImage? _compiledVector;
     private readonly DispatcherTimer _overlayTimer = new() { Interval = TimeSpan.FromMilliseconds(30) };
     private bool _updatingFromCanvas;
     private bool _applyingSettings;
@@ -109,6 +111,7 @@ public partial class MainWindow : Window
         InitializeFolding();
         InitializeSidebar();
         InitializeSnippetBuild();
+        InitializeWorkspaceFeatures();
         OverlayCanvas.LostMouseCapture += (_, _) => CancelCanvasInteraction();
         _overlayTimer.Tick += (_, _) => { _overlayTimer.Stop(); RenderWysiwyg(); };
         Editor.TextArea.Caret.PositionChanged += (_, _) => UpdateCoordinateContext();
@@ -272,10 +275,23 @@ public partial class MainWindow : Window
         return offset;
     }
 
-    private void RefreshSyntaxDiagnostics()
+    private readonly SemaphoreSlim _syntaxWorker = new(1);
+    private int _syntaxGeneration;
+    private async void RefreshSyntaxDiagnostics()
     {
+        var generation = ++_syntaxGeneration;
+        var source = Editor.Text;
+        await _syntaxWorker.WaitAsync();
+        IReadOnlyList<EditorDiagnostic> diagnostics;
+        try
+        {
+            if (generation != _syntaxGeneration || source != Editor.Text) return;
+            diagnostics = await Task.Run(() => TikzSyntaxDiagnostics.Analyze(source));
+        }
+        finally { _syntaxWorker.Release(); }
+        if (generation != _syntaxGeneration || source != Editor.Text) return;
         _syntaxDiagnostics.Clear();
-        _syntaxDiagnostics.AddRange(TikzSyntaxDiagnostics.Analyze(Editor.Text));
+        _syntaxDiagnostics.AddRange(diagnostics);
         RefreshDiagnosticsUi();
     }
 
@@ -424,6 +440,11 @@ public partial class MainWindow : Window
         // An explicit engine change must rebuild even with automatic preview off
         // or in Production mode. Compile_Click invalidates in-flight results.
         _previewTimer.Stop();
+        var preferences = SettingsStore.Current.Clone();
+        preferences.LastUsedEngine = (string)((ComboBoxItem)EngineSelector.SelectedItem).Tag;
+        try { SettingsStore.Save(preferences); }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        { ModeStatus.Text = "Compiler changed, but preference could not be saved: " + exception.Message; }
         _interactivePreviewTimer.Stop();
         _lastPreviewKey = null;
         Compile_Click(sender, e);
@@ -471,33 +492,26 @@ public partial class MainWindow : Window
         var previewWatch = Stopwatch.StartNew();
         try
         {
-            var render = isBackgroundRefresh
-                ? TexPreviewRenderer.RenderCachedAsync
-                : (Func<string, string, string?, string?, double, CancellationToken, UserSettings?, Task<TexPreviewResult>>)TexPreviewRenderer.RenderAsync;
             var documentDirectory = _filePath is null ? null : Path.GetDirectoryName(_filePath);
-            var rasterDpi = isBackgroundRefresh ? 192 : RequestedRasterDpi;
             var settings = SettingsStore.Current.Clone();
             // Process startup, dependency checks and format preparation must not block input.
-            var result = await Task.Run(() => render(source, engine, documentDirectory, preamble.Content,
-                rasterDpi, cancellationToken, settings), cancellationToken);
+            var result = await Task.Run(() => TexVectorRenderer.RenderAsync(source, engine, documentDirectory, preamble.Content,
+                cancellationToken, settings, isBackgroundRefresh), cancellationToken);
+            var diagnosticsTask = Task.Run(() => ParseCompilerDiagnostics(result.Log, result.UserSourceStartLine, result.ExitCode, source), cancellationToken);
+            var compilerDiagnostics = await diagnosticsTask;
             if (generation != _compileGeneration || source != Editor.Text)
                 return;
-            ModeStatus.Text = result.ExitCode == 0 && File.Exists(result.PngPath)
+            ModeStatus.Text = result.ExitCode == 0 && result.Image is not null
                 ? $"Exact TeX preview ready · {engine} · {previewWatch.ElapsedMilliseconds} ms"
                 : $"Compilation failed with exit code {result.ExitCode}";
-            if (result.ExitCode == 0 && File.Exists(result.PngPath))
+            if (result.ExitCode == 0 && result.Image is not null)
             {
                 _lastPreviewKey = previewKey;
                 _lastPreviewPath = result.PdfPath;
-                _lastPreviewPngPath = result.PngPath;
+                _lastPreviewPngPath = null;
                 _lastPreviewBoundingBox = result.BoundingBox;
-                _lastPreviewRasterDpi = result.RasterDpi;
-                DisplayCompiledPreview(result.PngPath, result.BoundingBox);
-                if (isBackgroundRefresh && RequestedRasterDpi > result.RasterDpi * 1.15)
-                {
-                    _zoomRasterTimer.Stop();
-                    _zoomRasterTimer.Start();
-                }
+                _compiledBitmap = null;
+                DisplayVectorPreview(result.Image, result.BoundingBox);
                 if (!_hasCenteredExactPreview)
                 {
                     _hasCenteredExactPreview = true;
@@ -514,7 +528,7 @@ public partial class MainWindow : Window
             if (generation != _compileGeneration || source != Editor.Text) return;
             OutputText.Text = outputHeader + result.Log;
             _compilerDiagnostics.Clear();
-            _compilerDiagnostics.AddRange(ParseCompilerDiagnostics(result.Log, result.UserSourceStartLine, result.ExitCode));
+            _compilerDiagnostics.AddRange(compilerDiagnostics);
             RefreshDiagnosticsUi();
             if (_compilerDiagnostics.Count > 0 && !isBackgroundRefresh)
                 BottomTabs.SelectedItem = ProblemsTab;
@@ -536,8 +550,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private IReadOnlyList<EditorDiagnostic> ParseCompilerDiagnostics(string log, int userSourceStartLine, int exitCode)
+    private static IReadOnlyList<EditorDiagnostic> ParseCompilerDiagnostics(string log, int userSourceStartLine, int exitCode, string source)
     {
+        // This document belongs exclusively to this worker, never to AvalonEdit's UI.
+        var document = new ICSharpCode.AvalonEdit.Document.TextDocument(source);
+        EditorDiagnostic Diagnostic(int number, string message, EditorDiagnosticSeverity severity)
+        {
+            var line = document.GetLineByNumber(Math.Clamp(number, 1, document.LineCount));
+            var indentation = document.GetText(line).TakeWhile(char.IsWhiteSpace).Count();
+            return new EditorDiagnostic(line.Offset + indentation, Math.Max(1, line.Length - indentation), line.LineNumber, indentation + 1, message, "LaTeX", severity);
+        }
         var diagnostics = new List<EditorDiagnostic>();
         foreach (Match match in Regex.Matches(log,
                      @"tikzedt-preview\.tex:(?<line>\d+):\s*(?<message>[^\r\n]+)",
@@ -545,7 +567,7 @@ public partial class MainWindow : Window
         {
             var compiledLine = int.Parse(match.Groups["line"].Value, CultureInfo.InvariantCulture);
             var userLine = compiledLine - userSourceStartLine + 1;
-            if (userLine < 1 || userLine > Editor.Document.LineCount)
+            if (userLine < 1 || userLine > document.LineCount)
                 continue;
             var message = match.Groups["message"].Value.Trim();
             if (message.StartsWith("==>", StringComparison.Ordinal))
@@ -553,7 +575,7 @@ public partial class MainWindow : Window
             var severity = message.Contains("warning", StringComparison.OrdinalIgnoreCase)
                 ? EditorDiagnosticSeverity.Warning
                 : EditorDiagnosticSeverity.Error;
-            diagnostics.Add(CreateCompilerDiagnostic(userLine, message, severity));
+            diagnostics.Add(Diagnostic(userLine, message, severity));
         }
 
         if (diagnostics.Count == 0)
@@ -574,13 +596,13 @@ public partial class MainWindow : Window
                         break;
                     }
                 }
-                var userLine = Math.Clamp(compiledLine - userSourceStartLine + 1, 1, Editor.Document.LineCount);
-                diagnostics.Add(CreateCompilerDiagnostic(userLine, message, EditorDiagnosticSeverity.Error));
+                var userLine = Math.Clamp(compiledLine - userSourceStartLine + 1, 1, document.LineCount);
+                diagnostics.Add(Diagnostic(userLine, message, EditorDiagnosticSeverity.Error));
             }
         }
 
         if (diagnostics.Count == 0 && exitCode != 0)
-            diagnostics.Add(CreateCompilerDiagnostic(1, "LaTeX compilation failed. Open Output for the complete compiler message.", EditorDiagnosticSeverity.Error));
+            diagnostics.Add(Diagnostic(1, "LaTeX compilation failed. Open Output for the complete compiler message.", EditorDiagnosticSeverity.Error));
 
         return diagnostics
             .GroupBy(item => (item.Line, item.Message))
@@ -641,7 +663,7 @@ public partial class MainWindow : Window
             var settings = SettingsStore.Current;
             EditorAppearance.Apply(Editor, settings);
             _previewTimer.Interval = TimeSpan.FromMilliseconds(settings.PreviewDelayMs);
-            EngineSelector.SelectedItem = EngineSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item => (string)item.Tag == settings.DefaultEngine);
+            EngineSelector.SelectedItem = EngineSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item => (string)item.Tag == settings.StartupEngine);
             GridToggle.IsChecked = settings.ShowGrid;
             SnapToggle.IsChecked = settings.SnapToGrid;
             GridStepSelector.SelectedItem = GridStepSelector.Items.OfType<ComboBoxItem>()
@@ -761,6 +783,8 @@ public partial class MainWindow : Window
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (Editor.IsKeyboardFocusWithin && HandleSourceEditorKey(e.Key, Keyboard.Modifiers)) { e.Handled = true; return; }
+        if (HandleWorkspaceShortcut(e)) return;
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Space && Editor.IsKeyboardFocusWithin)
         {
             ShowCompletion();
@@ -855,7 +879,8 @@ public partial class MainWindow : Window
             catch { Compile_Click(sender, e); return; }
             if (_lastPreviewKey == key && _lastPreviewPath is not null && File.Exists(_lastPreviewPath))
             {
-                if (_lastPreviewPngPath is not null && File.Exists(_lastPreviewPngPath))
+                if (_compiledVector is not null) DisplayVectorPreview(_compiledVector, _lastPreviewBoundingBox);
+                else if (_lastPreviewPngPath is not null && File.Exists(_lastPreviewPngPath))
                     DisplayCompiledPreview(_lastPreviewPngPath, _lastPreviewBoundingBox);
                 ModeStatus.Text = "Preview ready";
             }
@@ -866,6 +891,7 @@ public partial class MainWindow : Window
 
     private void DisplayCompiledPreview(string pngPath, Rect boundingBox)
     {
+        _compiledVector = null;
         if (_compiledBitmap is not BitmapImage cached || cached.UriSource?.LocalPath != pngPath)
         {
             var loaded = new BitmapImage();
@@ -878,7 +904,19 @@ public partial class MainWindow : Window
         }
         var bitmap = _compiledBitmap;
 
-        CompiledPreviewImage.Source = bitmap;
+        PlaceCompiledPreview(bitmap, boundingBox);
+    }
+
+    private void DisplayVectorPreview(DrawingImage image, Rect boundingBox)
+    {
+        _compiledVector = image;
+        _zoomRasterTimer.Stop();
+        PlaceCompiledPreview(image, boundingBox);
+    }
+
+    private void PlaceCompiledPreview(ImageSource image, Rect boundingBox)
+    {
+        CompiledPreviewImage.Source = image;
         ConfigureSurfaceForMode();
         if (WysiwygMode.IsChecked != true)
         {
@@ -891,8 +929,8 @@ public partial class MainWindow : Window
         }
         if (boundingBox.IsEmpty)
         {
-            CompiledPreviewImage.Width = bitmap.PixelWidth * 96d / bitmap.DpiX;
-            CompiledPreviewImage.Height = bitmap.PixelHeight * 96d / bitmap.DpiY;
+            CompiledPreviewImage.Width = image.Width;
+            CompiledPreviewImage.Height = image.Height;
             Canvas.SetLeft(CompiledPreviewImage, CanvasSize / 2 - CompiledPreviewImage.Width / 2);
             Canvas.SetTop(CompiledPreviewImage, CanvasSize / 2 - CompiledPreviewImage.Height / 2);
             UpdateControlMarkers();
@@ -922,12 +960,12 @@ public partial class MainWindow : Window
                 Canvas.SetTop(CompiledPreviewImage, ToCanvasY(_lastPreviewBoundingBox.Bottom));
             }
         }
-        else if (_compiledBitmap is not null)
+        else if (_compiledVector is not null || _compiledBitmap is not null)
         {
             // The PDF page is already cropped by TeX. Use its physical size,
             // rather than the workspace extent or coordinate-overlay scale.
-            GraphicalSurface.Width = _compiledBitmap.PixelWidth * 96d / _compiledBitmap.DpiX;
-            GraphicalSurface.Height = _compiledBitmap.PixelHeight * 96d / _compiledBitmap.DpiY;
+            GraphicalSurface.Width = _compiledVector?.Width ?? _compiledBitmap!.Width;
+            GraphicalSurface.Height = _compiledVector?.Height ?? _compiledBitmap!.Height;
             CompiledPreviewImage.Width = GraphicalSurface.Width;
             CompiledPreviewImage.Height = GraphicalSurface.Height;
             Canvas.SetLeft(CompiledPreviewImage, 0);
@@ -962,6 +1000,7 @@ public partial class MainWindow : Window
         var localCenterY = (GraphicalScroller.VerticalOffset + GraphicalScroller.ViewportHeight / 2) / oldScale;
         GraphicalScale.ScaleX = scale;
         GraphicalScale.ScaleY = scale;
+        UpdateGridPresentation();
         if (IsLoaded && _selectionDragElement is null && _draggedHandle is null) RefreshSelectionPresentation();
         else if (IsLoaded) UpdateControlMarkers();
         ZoomText.Text = $"{e.NewValue:0}%";
@@ -973,7 +1012,7 @@ public partial class MainWindow : Window
                 GraphicalScroller.ScrollToVerticalOffset(localCenterY * scale - GraphicalScroller.ViewportHeight / 2);
             }, DispatcherPriority.Loaded);
 
-            if (RequestedRasterDpi > _lastPreviewRasterDpi * 1.15 && _lastPreviewPath is not null)
+            if (_compiledVector is null && RequestedRasterDpi > _lastPreviewRasterDpi * 1.15 && _lastPreviewPath is not null)
             {
                 _zoomRasterTimer.Stop();
                 _zoomRasterTimer.Start();
@@ -986,6 +1025,7 @@ public partial class MainWindow : Window
 
     private async Task RefreshRasterForZoomAsync()
     {
+        if (_compiledVector is not null) return; // Vector geometry scales locally; no converter job on zoom.
         if (_lastPreviewPath is null || !File.Exists(_lastPreviewPath))
             return;
 
@@ -996,19 +1036,23 @@ public partial class MainWindow : Window
         _zoomRasterCancellation?.Cancel();
         _zoomRasterCancellation?.Dispose();
         _zoomRasterCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+        var rasterToken = _zoomRasterCancellation.Token;
         try
         {
             var result = await TexPreviewRenderer.RasterizeAsync(
                 pdfPath,
                 boundingBox,
                 RequestedRasterDpi,
-                _zoomRasterCancellation.Token);
+                rasterToken);
+            var decoded = result.ExitCode == 0 && File.Exists(result.PngPath)
+                ? await PreviewImageLoader.LoadAsync(result.PngPath, rasterToken) : null;
             if (generation != _compileGeneration || pdfPath != _lastPreviewPath || source != Editor.Text ||
                 result.ExitCode != 0 || !File.Exists(result.PngPath))
                 return;
 
             _lastPreviewPngPath = result.PngPath;
             _lastPreviewRasterDpi = result.Dpi;
+            _compiledBitmap = decoded;
             DisplayCompiledPreview(result.PngPath, boundingBox);
             ModeStatus.Text = $"Crisp preview · {ZoomSlider.Value:0}% · {result.Dpi:0} DPI";
         }
@@ -1075,6 +1119,7 @@ public partial class MainWindow : Window
         var legacyDiagram = _cachedDiagram!;
         UpdateCoordinateContext();
         OverlayCanvas.Children.Clear();
+        DrawScopeGuides(legacyDiagram);
 
         foreach (Match match in PathRegex.Matches(Editor.Text))
         {
@@ -1092,7 +1137,7 @@ public partial class MainWindow : Window
                     ParseNumber(match.Groups["x2"].Value), ParseNumber(match.Groups["y2"].Value))
             };
             line.MouseLeftButtonDown += Shape_MouseLeftButtonDown;
-            OverlayCanvas.Children.Add(line);
+            OverlayCanvas.Children.Add(TransformHitShape(line));
         }
 
         foreach (Match match in RectangleRegex.Matches(Editor.Text))
@@ -1116,7 +1161,7 @@ public partial class MainWindow : Window
             rectangle.MouseLeftButtonDown += Shape_MouseLeftButtonDown;
             Canvas.SetLeft(rectangle, left);
             Canvas.SetTop(rectangle, top);
-            OverlayCanvas.Children.Add(rectangle);
+            OverlayCanvas.Children.Add(TransformHitShape(rectangle));
         }
 
         foreach (Match match in EllipseRegex.Matches(Editor.Text))
@@ -1138,7 +1183,7 @@ public partial class MainWindow : Window
             ellipse.MouseLeftButtonDown += Shape_MouseLeftButtonDown;
             Canvas.SetLeft(ellipse, ToCanvasX(x) - ellipse.Width / 2);
             Canvas.SetTop(ellipse, ToCanvasY(y) - ellipse.Height / 2);
-            OverlayCanvas.Children.Add(ellipse);
+            OverlayCanvas.Children.Add(TransformHitShape(ellipse));
         }
 
         foreach (Match match in NodeRegex.Matches(Editor.Text))
@@ -1159,7 +1204,7 @@ public partial class MainWindow : Window
                 BorderThickness = new Thickness(0),
                 Tag = info,
             };
-            node.Loaded += (_, _) => PositionNode(node, info.X, info.Y);
+            node.Loaded += (_, _) => { var world = FrameForOffset(info.Offset).ToWorld(new(info.X, info.Y)); PositionNode(node, world.X, world.Y); };
             node.MouseLeftButtonDown += Node_MouseLeftButtonDown;
             OverlayCanvas.Children.Add(node);
         }
@@ -1247,7 +1292,7 @@ public partial class MainWindow : Window
         return match.Groups["unit"].Value.ToLowerInvariant() switch
         {
             "mm" => value / 10,
-            "pt" => value / 28.45,
+            "pt" => value / TexPreviewRenderer.PointsPerTikzUnit,
             _ => value
         };
     }
@@ -1257,7 +1302,7 @@ public partial class MainWindow : Window
         if (!IsSelectionTool || sender is not Border node || node.Tag is not NodeVisual info)
             return;
 
-        BeginSelectionDrag(node, info, new Point(ToCanvasX(info.X), ToCanvasY(info.Y)), e);
+        BeginSelectionDrag(node, info, ToFrameCanvas(new(info.X, info.Y), FrameForOffset(info.Offset)), e);
     }
 
     private void Shape_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1265,9 +1310,7 @@ public partial class MainWindow : Window
         if (!IsSelectionTool || sender is not Shape shape || shape.Tag is not ShapeVisual info)
             return;
 
-        var center = shape is LineShape line
-            ? new Point((line.X1 + line.X2) / 2, (line.Y1 + line.Y2) / 2)
-            : new Point(Canvas.GetLeft(shape) + shape.Width / 2, Canvas.GetTop(shape) + shape.Height / 2);
+        var center = ToFrameCanvas(info.Kind == ShapeKind.Ellipse ? new(info.X1, info.Y1) : new((info.X1 + info.X2) / 2, (info.Y1 + info.Y2) / 2), FrameForOffset(info.Offset));
         BeginSelectionDrag(shape, info, center, e);
     }
 
@@ -1298,6 +1341,7 @@ public partial class MainWindow : Window
 
         for (var index = 0; index < points.Length; index++)
         {
+            points[index] = ToFrameCanvas(new(FromCanvasX(points[index].X), FromCanvasY(points[index].Y)), FrameForOffset(shape.Offset));
             var handle = CreateCrossMarker(
                 new HandleVisual(shape, index),
                 "Drag control point");
@@ -1362,9 +1406,10 @@ public partial class MainWindow : Window
             e.Handled = true;
             return;
         }
-        var x = FromCanvasX(point.X);
-        var y = FromCanvasY(point.Y);
         var shape = _draggedHandleInfo.Shape;
+        var local = FrameForOffset(shape.Offset).ToLocal(new(FromCanvasX(point.X), FromCanvasY(point.Y)));
+        var x = local.X;
+        var y = local.Y;
         var x1 = shape.X1;
         var y1 = shape.Y1;
         var x2 = shape.X2;
@@ -1444,7 +1489,8 @@ public partial class MainWindow : Window
     {
         var displayedPoint = SnapToggle.IsChecked == true ? SnapPoint(point) : point;
         var label = SnapToggle.IsChecked == true ? "Snap" : "Mouse";
-        MousePositionText.Text = $"{label}  {FormatNumber(FromCanvasX(displayedPoint.X))}, {FormatNumber(FromCanvasY(displayedPoint.Y))}";
+        var local = CanvasToCode(displayedPoint);
+        MousePositionText.Text = $"{label}  {FormatNumber(local.X)}, {FormatNumber(local.Y)}";
     }
 
     private void OverlayCanvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -1482,7 +1528,8 @@ public partial class MainWindow : Window
         if (NodeTool.IsChecked == true && e.OriginalSource is not Border)
         {
             var point = SnapPoint(ClampToCanvas(e.GetPosition(OverlayCanvas)));
-            InsertTikzCommand($"    \\node at ({FormatNumber(FromCanvasX(point.X))},{FormatNumber(FromCanvasY(point.Y))}) {{node}};\n");
+            var local = CanvasToCode(point);
+            InsertTikzCommand($"    \\node at ({FormatNumber(local.X)},{FormatNumber(local.Y)}) {{node}};\n");
             SelectTool.IsChecked = true;
             RenderWysiwyg();
             e.Handled = true;
@@ -1526,21 +1573,23 @@ public partial class MainWindow : Window
 
     private void InsertShapeCommand(Point start, Point end)
     {
+        start = CanvasToCode(start);
+        end = CanvasToCode(end);
         string command;
         if (PathTool.IsChecked == true)
         {
-            command = $"    \\draw ({FormatNumber(FromCanvasX(start.X))},{FormatNumber(FromCanvasY(start.Y))}) -- ({FormatNumber(FromCanvasX(end.X))},{FormatNumber(FromCanvasY(end.Y))});\n";
+            command = $"    \\draw ({FormatNumber(start.X)},{FormatNumber(start.Y)}) -- ({FormatNumber(end.X)},{FormatNumber(end.Y)});\n";
         }
         else if (RectangleTool.IsChecked == true)
         {
-            command = $"    \\draw ({FormatNumber(FromCanvasX(start.X))},{FormatNumber(FromCanvasY(start.Y))}) rectangle ({FormatNumber(FromCanvasX(end.X))},{FormatNumber(FromCanvasY(end.Y))});\n";
+            command = $"    \\draw ({FormatNumber(start.X)},{FormatNumber(start.Y)}) rectangle ({FormatNumber(end.X)},{FormatNumber(end.Y)});\n";
         }
         else
         {
             var center = new Point((start.X + end.X) / 2, (start.Y + end.Y) / 2);
-            var rx = Math.Abs(end.X - start.X) / (2 * CoordinateScale);
-            var ry = Math.Abs(end.Y - start.Y) / (2 * CoordinateScale);
-            command = $"    \\draw ({FormatNumber(FromCanvasX(center.X))},{FormatNumber(FromCanvasY(center.Y))}) ellipse ({FormatNumber(rx)} and {FormatNumber(ry)});\n";
+            var rx = Math.Abs(end.X - start.X) / 2;
+            var ry = Math.Abs(end.Y - start.Y) / 2;
+            command = $"    \\draw ({FormatNumber(center.X)},{FormatNumber(center.Y)}) ellipse ({FormatNumber(rx)} and {FormatNumber(ry)});\n";
         }
         InsertTikzCommand(command);
     }
@@ -1548,6 +1597,11 @@ public partial class MainWindow : Window
     private void InsertTikzCommand(string command)
     {
         var insertionPoint = Editor.Text.LastIndexOf("\\end{tikzpicture}", StringComparison.Ordinal);
+        if (_cachedDiagram is { } diagram)
+        {
+            var scope = diagram.Scopes.Where(scope => Editor.CaretOffset >= scope.Offset && Editor.CaretOffset <= scope.Offset + scope.Length).OrderBy(scope => scope.Length).FirstOrDefault();
+            if (scope.Length > 0) insertionPoint = Editor.Text.LastIndexOf("\\end{scope}", scope.Offset + scope.Length - 1, scope.Length, StringComparison.Ordinal);
+        }
         if (insertionPoint < 0) insertionPoint = Editor.Text.LastIndexOf("\\end{circuitikz}", StringComparison.Ordinal);
         if (insertionPoint < 0)
             insertionPoint = Editor.Text.Length;
@@ -1563,25 +1617,8 @@ public partial class MainWindow : Window
         if (SnapToggle.IsChecked != true)
             return point;
 
-        var step = CurrentGridStep * CoordinateScale;
-        if (!_isPolarGrid)
-        {
-            var origin = CanvasSize / 2;
-            return ClampToCanvas(new Point(
-                origin + Math.Round((point.X - origin) / step, MidpointRounding.AwayFromZero) * step,
-                origin + Math.Round((point.Y - origin) / step, MidpointRounding.AwayFromZero) * step));
-        }
-
-        var dx = point.X - CanvasSize / 2;
-        var dy = CanvasSize / 2 - point.Y;
-        var radius = Math.Sqrt(dx * dx + dy * dy);
-        var angle = Math.Atan2(dy, dx);
-        var snappedRadius = Math.Round(radius / step, MidpointRounding.AwayFromZero) * step;
-        var angularStep = Math.PI / 12;
-        var snappedAngle = Math.Round(angle / angularStep, MidpointRounding.AwayFromZero) * angularStep;
-        return ClampToCanvas(new Point(
-            CanvasSize / 2 + Math.Cos(snappedAngle) * snappedRadius,
-            CanvasSize / 2 - Math.Sin(snappedAngle) * snappedRadius));
+        var world = _coordinateFrame.Snap(new(FromCanvasX(point.X), FromCanvasY(point.Y)), CurrentGridStep, _isPolarGrid);
+        return ClampToCanvas(new(ToCanvasX(world.X), ToCanvasY(world.Y)));
     }
 
     private double CurrentGridStep
@@ -1598,57 +1635,13 @@ public partial class MainWindow : Window
         if (PreviewGrid is null || GridKindText is null)
             return;
 
-        var key = $"{_isPolarGrid}:{CurrentGridStep}";
+        var key = $"{_isPolarGrid}:{CurrentGridStep}:{_coordinateFrame.Transform}:{GraphicalScale?.ScaleX ?? 1}";
         if (_gridPresentationKey == key)
             return;
         _gridPresentationKey = key;
 
         GridKindText.Text = _isPolarGrid ? "Polar · 15°" : "Cartesian";
-        var spacing = Math.Max(2, CurrentGridStep * CoordinateScale);
-        var pen = new Pen(new SolidColorBrush(Color.FromRgb(226, 229, 233)), 0.5);
-
-        if (!_isPolarGrid)
-        {
-            var grid = new DrawingGroup();
-            grid.Children.Add(new GeometryDrawing(Brushes.White, null, new RectangleGeometry(new Rect(0, 0, CanvasSize, CanvasSize))));
-            var cartesianCenter = CanvasSize / 2;
-            for (var x = cartesianCenter; x <= CanvasSize; x += spacing)
-                grid.Children.Add(new GeometryDrawing(null, pen, new LineGeometry(new Point(x, 0), new Point(x, CanvasSize))));
-            for (var x = cartesianCenter - spacing; x >= 0; x -= spacing)
-                grid.Children.Add(new GeometryDrawing(null, pen, new LineGeometry(new Point(x, 0), new Point(x, CanvasSize))));
-            for (var y = cartesianCenter; y <= CanvasSize; y += spacing)
-                grid.Children.Add(new GeometryDrawing(null, pen, new LineGeometry(new Point(0, y), new Point(CanvasSize, y))));
-            for (var y = cartesianCenter - spacing; y >= 0; y -= spacing)
-                grid.Children.Add(new GeometryDrawing(null, pen, new LineGeometry(new Point(0, y), new Point(CanvasSize, y))));
-            var axisPen = new Pen(new SolidColorBrush(Color.FromRgb(175, 182, 190)), 0.8);
-            grid.Children.Add(new GeometryDrawing(null, axisPen, new LineGeometry(new Point(cartesianCenter, 0), new Point(cartesianCenter, CanvasSize))));
-            grid.Children.Add(new GeometryDrawing(null, axisPen, new LineGeometry(new Point(0, cartesianCenter), new Point(CanvasSize, cartesianCenter))));
-            PreviewGrid.Fill = new DrawingBrush(grid)
-            {
-                Viewport = new Rect(0, 0, CanvasSize, CanvasSize),
-                ViewportUnits = BrushMappingMode.Absolute,
-                Stretch = Stretch.None
-            };
-            return;
-        }
-
-        var group = new DrawingGroup();
-        group.Children.Add(new GeometryDrawing(Brushes.White, null, new RectangleGeometry(new Rect(0, 0, CanvasSize, CanvasSize))));
-        var center = new Point(CanvasSize / 2, CanvasSize / 2);
-        for (var radius = spacing; radius <= CanvasSize * 0.72; radius += spacing)
-            group.Children.Add(new GeometryDrawing(null, pen, new EllipseGeometry(center, radius, radius)));
-        for (var degrees = 0; degrees < 360; degrees += 15)
-        {
-            var radians = degrees * Math.PI / 180;
-            var end = new Point(center.X + Math.Cos(radians) * CanvasSize, center.Y - Math.Sin(radians) * CanvasSize);
-            group.Children.Add(new GeometryDrawing(null, pen, new LineGeometry(center, end)));
-        }
-        PreviewGrid.Fill = new DrawingBrush(group)
-        {
-            Viewport = new Rect(0, 0, CanvasSize, CanvasSize),
-            ViewportUnits = BrushMappingMode.Absolute,
-            Stretch = Stretch.None
-        };
+        PreviewGrid.Fill = _coordinateFrame.Grid(CanvasSize, CoordinateScale, CurrentGridStep, _isPolarGrid, GraphicalScale?.ScaleX ?? 1);
     }
 
     private void SetPolarGrid(bool polar)
@@ -1663,6 +1656,7 @@ public partial class MainWindow : Window
         if (!IsLoaded || _selectionDragElement is not null || _draggedHandle is not null)
             return;
         var offset = Editor.CaretOffset;
+        UpdateActiveCoordinateFrame(offset);
         var line = Editor.Document.GetLineByOffset(offset);
         var coordinates = Regex.Matches(Editor.Document.GetText(line), @"\([^()]*\)");
         Match? nearest = coordinates.Cast<Match>().OrderBy(match =>

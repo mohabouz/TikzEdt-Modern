@@ -5,6 +5,8 @@ namespace TikzEdt.Modern;
 /// <summary>Small session cache; recorder dependencies prevent stale included files.</summary>
 internal sealed class PreviewResultCache
 {
+    private readonly bool _requirePng;
+    public PreviewResultCache(bool requirePng = true) => _requirePng = requirePng;
     private sealed record Dependency(string Path, long Length, long Modified);
     private sealed record Entry(string Key, TexPreviewResult Result, Dependency[] Dependencies);
     private readonly LinkedList<Entry> _entries = [];
@@ -23,7 +25,7 @@ internal sealed class PreviewResultCache
                 {
                     var entry = node.Value;
                     _entries.Remove(node);
-                    if (!File.Exists(entry.Result.PdfPath) || !File.Exists(entry.Result.PngPath) ||
+                    if (!File.Exists(entry.Result.PdfPath) || (_requirePng && !File.Exists(entry.Result.PngPath)) ||
                         entry.Dependencies.Any(dependency => Snapshot(dependency.Path) != dependency)) return null;
                     _entries.AddFirst(entry);
                     return entry.Result;
@@ -36,7 +38,7 @@ internal sealed class PreviewResultCache
 
     public void Store(string key, TexPreviewResult result, string workingDirectory)
     {
-        if (result.ExitCode != 0 || !File.Exists(result.PdfPath) || !File.Exists(result.PngPath)) return;
+        if (result.ExitCode != 0 || !File.Exists(result.PdfPath) || (_requirePng && !File.Exists(result.PngPath))) return;
         var recorder = Path.ChangeExtension(result.PdfPath, ".fls");
         if (!File.Exists(recorder)) return; // Never cache without dependency information.
         var jobDirectory = Path.GetDirectoryName(result.PdfPath)! + Path.DirectorySeparatorChar;

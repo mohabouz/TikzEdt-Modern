@@ -55,6 +55,7 @@
             <TabItem Header="Compiler">
                 <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="12">
                     <TextBlock Text="Default engine"/>
+                    <CheckBox Style="{StaticResource Option}" Content="Start with the last used compiler (instead of the default below)" IsChecked="{Binding RememberLastEngine}"/>
                     <ComboBox Margin="0,5,0,9" SelectedValuePath="Tag" SelectedValue="{Binding DefaultEngine}"><ComboBoxItem Tag="pdflatex">pdfLaTeX</ComboBoxItem><ComboBoxItem Tag="lualatex">LuaLaTeX</ComboBoxItem><ComboBoxItem Tag="xelatex">XeLaTeX</ComboBoxItem></ComboBox>
                     <TextBlock Text="pdfLaTeX executable"/><TextBox Style="{StaticResource Field}" Text="{Binding PdfLatexPath}"/>
                     <TextBlock Text="LuaLaTeX executable"/><TextBox Style="{StaticResource Field}" Text="{Binding LuaLatexPath}"/>
@@ -66,8 +67,17 @@
                     <CheckBox Style="{StaticResource Option}" Content="Use fast precompiled headers for pdfLaTeX" IsChecked="{Binding UsePrecompiledFormats}"/>
                     <CheckBox Style="{StaticResource Option}" Content="Automatically compile after source edits" IsChecked="{Binding AutomaticPreview}"/>
                     <TextBlock Text="Automatic preview delay (milliseconds)" Margin="0,8,0,0"/><TextBox Style="{StaticResource Field}" Text="{Binding PreviewDelayMs}"/>
-                    <TextBlock Text="Preview raster quality (DPI at 100% zoom)"/><TextBox Style="{StaticResource Field}" Text="{Binding PreviewDpi}"/>
+                    <TextBlock Text="Raster export quality (DPI; vector previews are resolution-independent)"/><TextBox Style="{StaticResource Field}" Text="{Binding PreviewDpi}"/>
                 </StackPanel></ScrollViewer>
+            </TabItem>
+            <TabItem Header="Chemfig">
+                <StackPanel Margin="12">
+                    <TextBlock Text="Default lone-pair representation"/>
+                    <ComboBox Margin="0,5,0,12" SelectedValuePath="Tag" SelectedValue="{Binding DefaultLonePairStyle}">
+                        <ComboBoxItem Tag="Line">Line (non-bonding electron pair)</ComboBoxItem><ComboBoxItem Tag="Dots">Two dots (Lewis notation)</ComboBoxItem>
+                    </ComboBox>
+                    <TextBlock Text="Applies to new lone pairs. Existing and imported pairs keep their representation; the Chemfig side panel can override it for a particular pair." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}"/>
+                </StackPanel>
             </TabItem>
             <TabItem Header="Canvas">
                 <StackPanel Margin="12">

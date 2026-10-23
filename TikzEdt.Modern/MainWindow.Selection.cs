@@ -39,6 +39,7 @@ public partial class MainWindow
             return;
         }
         if (SelectionKey(tag) is not { } key) return;
+        if (e.ClickCount == 2 && TryEditChemfigRange(key.Offset, key.Length)) { e.Handled = true; return; }
         var toggle = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         var retained = _canvasSelection.Click(key, toggle);
         _selectionSource = Editor.Text;
@@ -115,8 +116,8 @@ public partial class MainWindow
             var text = tag switch
             {
                 LegacyTikzPoint legacy => LegacyTikzAdapter.MovePoint(legacy, legacy.Position + delta),
-                NodeVisual node => $"{node.Prefix}({FormatNumber(node.X + delta.X)},{FormatNumber(node.Y + delta.Y)}){node.Suffix}",
-                ShapeVisual shape => ShapeSource(shape, delta),
+                NodeVisual node => TranslateSourceRange(node.Offset, node.Length, delta) ?? $"{node.Prefix}({FormatNumber(node.X + LocalDelta(node.Offset, delta).X)},{FormatNumber(node.Y + LocalDelta(node.Offset, delta).Y)}){node.Suffix}",
+                ShapeVisual shape => TranslateSourceRange(shape.Offset, shape.Length, delta) ?? ShapeSource(shape, LocalDelta(shape.Offset, delta)),
                 _ => null
             };
             if (text is not null) changes.Add((key, text));
@@ -278,6 +279,7 @@ public partial class MainWindow
 
     private void UpdateControlMarkers()
     {
+        foreach (var guide in OverlayCanvas.Children.OfType<Shape>().Where(shape => Equals(shape.Tag, "scope-guide"))) guide.StrokeThickness = 0.65 / GraphicalScale.ScaleX;
         foreach (var marker in OverlayCanvas.Children.OfType<ControlMarker>())
         {
             var selected = SelectionKey(marker.Tag) is { } key && _canvasSelection.Contains(key);
@@ -308,7 +310,23 @@ public partial class MainWindow
 
     private bool MarkerOverSimilarColor(ControlMarker marker, bool selected)
     {
-        if (_compiledBitmap is null || CompiledPreviewImage.Width <= 0 || CompiledPreviewImage.Height <= 0) return false;
+        if (CompiledPreviewImage.Width <= 0 || CompiledPreviewImage.Height <= 0) return false;
+        if (_compiledVector is not null)
+        {
+            // A tiny, on-demand colour probe keeps red/blue handles visible over
+            // similar vector ink. The displayed figure itself remains vector-only.
+            var xProbe = Canvas.GetLeft(marker) + marker.Width / 2 - Canvas.GetLeft(CompiledPreviewImage);
+            var yProbe = Canvas.GetTop(marker) + marker.Height / 2 - Canvas.GetTop(CompiledPreviewImage);
+            if (!double.IsFinite(xProbe) || !double.IsFinite(yProbe) || xProbe < 0 || yProbe < 0 || xProbe >= CompiledPreviewImage.Width || yProbe >= CompiledPreviewImage.Height) return false;
+            var visual = new DrawingVisual();
+            using (var drawing = visual.RenderOpen()) drawing.DrawImage(_compiledVector, new Rect(2 - xProbe, 2 - yProbe, CompiledPreviewImage.Width, CompiledPreviewImage.Height));
+            var probe = new RenderTargetBitmap(5, 5, 96, 96, PixelFormats.Pbgra32); probe.Render(visual);
+            var samples = new byte[100]; probe.CopyPixels(samples, 20, 0);
+            for (var i = 0; i < samples.Length; i += 4)
+                if (samples[i + 3] >= 100 && (selected ? samples[i] > 120 && samples[i] > samples[i + 2] * 1.3 : samples[i + 2] > 120 && samples[i + 2] > samples[i + 1] * 1.4 && samples[i + 2] > samples[i] * 1.4)) return true;
+            return false;
+        }
+        if (_compiledBitmap is null) return false;
         var x = (Canvas.GetLeft(marker) + marker.Width / 2 - Canvas.GetLeft(CompiledPreviewImage)) / CompiledPreviewImage.Width * _compiledBitmap.PixelWidth;
         var y = (Canvas.GetTop(marker) + marker.Height / 2 - Canvas.GetTop(CompiledPreviewImage)) / CompiledPreviewImage.Height * _compiledBitmap.PixelHeight;
         if (!double.IsFinite(x) || !double.IsFinite(y) || x < 0 || y < 0 || x >= _compiledBitmap.PixelWidth || y >= _compiledBitmap.PixelHeight) return false;

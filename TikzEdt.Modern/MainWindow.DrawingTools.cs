@@ -51,7 +51,7 @@ public partial class MainWindow
         if (AdvancedTool is not { } tool || _advancedPoints.Count == 0) return false;
         try
         {
-            var points = _advancedPoints.Select(point => new Point(FromCanvasX(point.X), FromCanvasY(point.Y))).ToArray();
+            var points = _advancedPoints.Select(CanvasToCode).ToArray();
             var code = DrawingCommandBuilder.Build(tool, points, CurrentGridStep);
             CancelAdvancedDrawing();
             InsertTikzCommand("    " + code + "\n");
@@ -104,15 +104,14 @@ public partial class MainWindow
         }
         else if (tool == "grid")
         {
-            var start = points[0];
-            var step = CurrentGridStep * CoordinateScale;
-            var left = Math.Min(start.X, pointer.X); var right = Math.Max(start.X, pointer.X);
-            var top = Math.Min(start.Y, pointer.Y); var bottom = Math.Max(start.Y, pointer.Y);
-            void Line(Point a, Point b) { var figure = new PathFigure { StartPoint = a }; figure.Segments.Add(new LineSegment(b, true)); geometry.Figures.Add(figure); }
-            var origin = CanvasSize / 2;
+            var start = CanvasToCode(points[0]); var end = CanvasToCode(pointer);
+            var step = CurrentGridStep;
+            var left = Math.Min(start.X, end.X); var right = Math.Max(start.X, end.X);
+            var top = Math.Min(start.Y, end.Y); var bottom = Math.Max(start.Y, end.Y);
+            void Line(Point a, Point b) { var figure = new PathFigure { StartPoint = ToFrameCanvas(a, _coordinateFrame) }; figure.Segments.Add(new LineSegment(ToFrameCanvas(b, _coordinateFrame), true)); geometry.Figures.Add(figure); }
             var lineCount = 0;
-            for (var x = origin + Math.Ceiling((left - origin) / step) * step; x <= right && lineCount++ < 400; x += step) Line(new(x, top), new(x, bottom));
-            for (var y = origin + Math.Ceiling((top - origin) / step) * step; y <= bottom && lineCount++ < 800; y += step) Line(new(left, y), new(right, y));
+            for (var x = Math.Ceiling(left / step) * step; x <= right && lineCount++ < 400; x += step) Line(new(x, top), new(x, bottom));
+            for (var y = Math.Ceiling(top / step) * step; y <= bottom && lineCount++ < 800; y += step) Line(new(left, y), new(right, y));
         }
         else if (points.Count >= 3)
         {

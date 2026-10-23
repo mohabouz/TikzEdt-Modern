@@ -12,6 +12,7 @@
     <Resource Include="Assets\Branding\TikzEdt.ico" />
     <ProjectReference Include="..\TikzEdt.Modern.Core\TikzEdt.Modern.Core.csproj" />
     <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
+    <PackageReference Include="SharpVectors.Wpf" Version="1.8.6" />
     <ProjectReference Include="..\Dependencies\TikzParser\TikzParser.csproj" />
     <Reference Include="Antlr3.Runtime"><HintPath>..\Dependencies\ParserRuntime\Antlr3.Runtime.dll</HintPath><Private>true</Private></Reference>
     <Reference Include="Antlr3.Utility"><HintPath>..\Dependencies\ParserRuntime\Antlr3.Utility.dll</HintPath><Private>true</Private></Reference>
@@ -23,5 +24,6 @@
     <Content Include="Assets\Editor\TheSnippets.xml" Link="TheSnippets.xml" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="CircuitikzCatalog.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="CircuitikzCatalog.README.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Dependencies\SharpVectors.LICENSE.txt" Link="SharpVectors.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

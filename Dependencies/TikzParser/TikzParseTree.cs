@@ -991,7 +991,7 @@ namespace TikzEdt.Parser
         {
             try
             {
-                number = Double.Parse(t.GetChild(0).Text, CultureInfo.InvariantCulture);
+                _number = Double.Parse(t.GetChild(0).Text, CultureInfo.InvariantCulture);
             }
             catch (FormatException)
             {
@@ -1015,9 +1015,13 @@ namespace TikzEdt.Parser
             }
         }
         public string unit="";
+        public void SetNumberWithPrecision(double value, int decimals)
+        {
+            _number = Math.Round(value, Math.Max(0, Math.Min(10, decimals)), MidpointRounding.AwayFromZero);
+        }
         public override string ToString()
         {
-            return number.ToString() + unit;
+            return number.ToString("0.##########", CultureInfo.InvariantCulture) + unit;
         }
         /// <summary>
         /// 

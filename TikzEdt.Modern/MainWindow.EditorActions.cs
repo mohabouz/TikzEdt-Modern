@@ -9,6 +9,7 @@ public partial class MainWindow
     private void InitializeEditorActions()
     {
         var menu = new ContextMenu();
+        Editor.Options.EnableRectangularSelection = true;
         void Command(string header, ICommand command, string gesture)
             => menu.Items.Add(new MenuItem { Header = header, Command = command, CommandTarget = Editor.TextArea, InputGestureText = gesture });
         Command("Undo", ApplicationCommands.Undo, "Ctrl+Z");
@@ -20,15 +21,21 @@ public partial class MainWindow
         Command("Delete", ApplicationCommands.Delete, "Delete");
         Command("Select All", ApplicationCommands.SelectAll, "Ctrl+A");
         menu.Items.Add(new Separator());
-        var format = new MenuItem { Header = "Format Code", InputGestureText = "Ctrl+Shift+F", ToolTip = "Indent selected lines, or the whole document when nothing is selected" };
+        var format = new MenuItem { Header = "Format Code", InputGestureText = "Ctrl+Shift+F", ToolTip = "Add structural line breaks and indent the selection, or the document when nothing is selected" };
         format.Click += FormatCode_Click;
         menu.Items.Add(format);
+        var comment = new MenuItem { Header = "Toggle Line Comment", InputGestureText = "Ctrl+/" };
+        comment.Click += (_, _) => ToggleSourceComment(); menu.Items.Add(comment);
+        var column = new MenuItem { Header = "Extend Column Selection Down", InputGestureText = "Ctrl+Alt+↓", ToolTip = "Type to edit the same column on several lines; Alt+Shift+arrows or Alt+drag also work. Escape returns to one caret." };
+        column.Click += (_, _) => HandleSourceEditorKey(Key.Down, ModifierKeys.Control | ModifierKeys.Alt); menu.Items.Add(column);
         var fold = new MenuItem { Header = "Fold All", InputGestureText = "Ctrl+Shift+[" };
         fold.Click += FoldAll_Click;
         menu.Items.Add(fold);
         var unfold = new MenuItem { Header = "Unfold All", InputGestureText = "Ctrl+Shift+]" };
         unfold.Click += UnfoldAll_Click;
         menu.Items.Add(unfold);
+        var chemistry = new MenuItem { Header = "Edit / insert Chemfig molecule…", ToolTip = "Place the caret inside a supported Chemfig command to edit its atoms and bonds." };
+        chemistry.Click += Chemfig_Click; menu.Items.Add(new Separator()); menu.Items.Add(chemistry);
         Editor.ContextMenu = menu;
         Editor.PreviewMouseRightButtonDown += (_, e) =>
         {
@@ -47,21 +54,17 @@ public partial class MainWindow
         var lastLine = document.GetLineByOffset(selected ? Editor.SelectionStart + Editor.SelectionLength - 1 : document.TextLength);
         var start = firstLine.Offset;
         var end = lastLine.EndOffset;
-        var edits = TikzCodeFormatter.CreateEdits(Editor.Text, settings.TabSize, settings.ConvertTabsToSpaces)
-            .Where(edit => edit.Offset >= start && edit.Offset <= end).ToArray();
+        var edits = TikzCodeFormatter.CreateEditsForRange(Editor.Text, start, end, settings.TabSize, settings.ConvertTabsToSpaces).ToArray();
         if (edits.Length == 0) { ModeStatus.Text = "Code indentation is already formatted"; return; }
-        var caretLine = document.GetLineByOffset(Editor.CaretOffset);
-        var caretLineNumber = caretLine.LineNumber;
-        var originalLine = document.GetText(caretLine);
-        var caretColumn = Math.Max(0, Editor.CaretOffset - caretLine.Offset - (originalLine.Length - originalLine.TrimStart(' ', '\t').Length));
+        var charactersBeforeCaret = Editor.Text[..Editor.CaretOffset].Count(c => !char.IsWhiteSpace(c));
         using (document.RunUpdate())
             foreach (var edit in edits.Reverse()) document.Replace(edit.Offset, edit.Length, edit.Text);
         if (selected) Editor.Select(start, end - start + edits.Sum(edit => edit.Text.Length - edit.Length));
         else
         {
-            var newLine = document.GetLineByNumber(caretLineNumber);
-            var text = document.GetText(newLine);
-            Editor.CaretOffset = Math.Min(newLine.EndOffset, newLine.Offset + text.Length - text.TrimStart(' ', '\t').Length + caretColumn);
+            var target = 0; var seen = 0;
+            while (target < document.TextLength && seen < charactersBeforeCaret) { if (!char.IsWhiteSpace(document.GetCharAt(target))) seen++; target++; }
+            Editor.CaretOffset = target;
         }
         RefreshFoldings();
         Editor.Focus();

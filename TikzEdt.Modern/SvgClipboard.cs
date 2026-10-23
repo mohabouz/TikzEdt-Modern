@@ -19,7 +19,10 @@ internal static class SvgClipboard
             RedirectStandardError = true,
             RedirectStandardOutput = true
         };
-        foreach (var argument in new[] { "-svg", "-f", "1", "-l", "1", pdfPath, svgPath })
+        // SVG is a coordinate-accurate page, not a print-to-fit job. Poppler
+        // otherwise fits to integer-rounded crop dimensions, shrinking/centering
+        // the paths while leaving the declared page dimensions unchanged.
+        foreach (var argument in new[] { "-svg", "-noshrink", "-nocenter", "-f", "1", "-l", "1", pdfPath, svgPath })
             start.ArgumentList.Add(argument);
         using var process = Process.Start(start) ?? throw new IOException("Could not start SVG conversion.");
         var error = process.StandardError.ReadToEndAsync(cancellationToken);

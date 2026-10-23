@@ -15,6 +15,8 @@ MiKTeX provides these PDF utilities; alternatively use Poppler tools on PATH.
 CircuiTikZ snippets require the circuitikz package. Other snippets may need
 additional packages/libraries. Preambles using fontspec or polyglossia require
 LuaLaTeX or XeLaTeX, not pdfLaTeX. Install any fonts named in your preamble.
+Chemfig editing requires the chemfig package. Laboratory drawings require
+pst-labo and its dependencies; LuaLaTeX is recommended for laboratory previews.
 
 This is a development preview, not a signed production release. Windows may
 display an unknown-publisher or SmartScreen warning for the unsigned setup.

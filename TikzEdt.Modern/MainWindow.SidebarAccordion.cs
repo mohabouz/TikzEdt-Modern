@@ -55,6 +55,7 @@ public partial class MainWindow
             SidebarRail.Visibility = Visibility.Visible;
             FilesRailButton.IsChecked = FilesSidebarTab.IsSelected;
             SnippetsRailButton.IsChecked = SnippetsSidebarTab.IsSelected;
+            SymbolsRailButton.IsChecked = SymbolsSidebarTab.IsSelected;
             _sidebarPreviewCancellation?.Cancel();
             _thumbnailTimer.Stop();
             _thumbnailCancellation.Cancel();

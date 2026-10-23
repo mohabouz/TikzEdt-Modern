@@ -3,6 +3,22 @@ using System.IO;
 
 var renderer = typeof(TikzEdt.Modern.MainWindow).Assembly.GetType("TikzEdt.Modern.TexPreviewRenderer")!;
 var render = renderer.GetMethod("RenderAsync", BindingFlags.Public | BindingFlags.Static)!;
+if (args.Contains("--chemfig-layout-regression")) { ChemfigLayoutRegression.Run(); return; }
+if (args.Contains("--labo-coverage-regression")) { LaboCoverageRegression.Run(); return; }
+if (args.Contains("--labo-coverage-integration")) { await LaboCoverageRegression.IntegrationAsync(); return; }
+if (args.Contains("--labo-navigation-regression")) { LaboNavigationRegression.Run(); return; }
+if (args.Contains("--labo-integration")) { await LaboNavigationRegression.IntegrationAsync(); return; }
+if (args.Contains("--labo-visual-proof")) { await LaboNavigationRegression.VisualProofAsync(); return; }
+if (args.Contains("--chemistry-editing-regression")) { ChemistryEditingRegression.Run(); return; }
+if (args.Contains("--chemfig-stereo-regression")) { ChemfigStereoRegression.Run(); return; }
+if (args.Contains("--chemfig-stereo-integration")) { await ChemfigStereoRegression.IntegrationAsync(); return; }
+if (args.Contains("--vector-alignment")) { await VectorAlignmentRegression.RunAsync(); return; }
+if (args.Contains("--vector-regression") || args.Contains("--vector-integration")) { await VectorPreviewRegression.RunAsync(args.Contains("--vector-integration")); return; }
+if (args.Contains("--chemfig-regression")) { ChemfigRegression.Run(); return; }
+if (args.Contains("--chemfig-dark-integration")) { await ChemfigRegression.IntegrationAsync(true); return; }
+if (args.Contains("--chemfig-integration")) { await ChemfigRegression.IntegrationAsync(); return; }
+if (args.Contains("--workspace-regression")) { WorkspaceRegression.Run(); return; }
+if (args.Contains("--workspace-export-integration")) { await WorkspaceRegression.ExportIntegrationAsync(); return; }
 if (args.Contains("--snippet-configuration") || args.Contains("--snippet-configuration-integration"))
 {
     await SnippetBatchRegression.RunConfigurationRegressionAsync(args.Contains("--snippet-configuration-integration"));

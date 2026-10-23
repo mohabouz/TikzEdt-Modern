@@ -83,7 +83,7 @@ internal static partial class TexPreviewRenderer
 \immediate\closeout\metadatafile
 """;
 
-    private const double PointsPerTikzUnit = 28.45;
+    internal const double PointsPerTikzUnit = 72.27 / 2.54; // TeX pt/cm, not PDF bp/cm.
     private const double MinimumRasterDpi = 96;
     private const double MaximumRasterDpi = 4000;
     private const double MaximumRasterPixels = 20_000_000;
@@ -103,6 +103,16 @@ internal static partial class TexPreviewRenderer
         double requestedRasterDpi,
         CancellationToken cancellationToken,
         UserSettings? settings = null)
+        => await RenderCoreAsync(tikzSource, engine, documentDirectory, customPreamble, requestedRasterDpi, cancellationToken, settings, true);
+
+    public static async Task<TexPreviewResult> RenderPdfAsync(
+        string tikzSource, string engine, string? documentDirectory, string? customPreamble,
+        CancellationToken cancellationToken, UserSettings? settings = null)
+        => await RenderCoreAsync(tikzSource, engine, documentDirectory, customPreamble, 0, cancellationToken, settings, false);
+
+    private static async Task<TexPreviewResult> RenderCoreAsync(
+        string tikzSource, string engine, string? documentDirectory, string? customPreamble,
+        double requestedRasterDpi, CancellationToken cancellationToken, UserSettings? settings, bool rasterize)
     {
         settings ??= SettingsStore.Current;
         var engineName = engine;
@@ -128,6 +138,7 @@ internal static partial class TexPreviewRenderer
         var requiredPackages = Regex.Matches(tikzSource, @"(?m)^\s*%\s*!TIKZEDT\s+PACKAGE\s+([a-zA-Z0-9_.-]+)")
             .Select(match => match.Groups[1].Value).ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (tikzSource.Contains("\\begin{circuitikz}", StringComparison.Ordinal)) requiredPackages.Add("circuitikz");
+        if (Regex.IsMatch(tikzSource, @"\\chemfig\b")) requiredPackages.Add("chemfig");
         var packageLines = string.Join("\n", requiredPackages.Select(package => $"\\usepackage{{{package}}}"));
         var effectivePreamble = BuildEffectivePreamble(customPreamble + "\n" + packageLines + "\n" + fragment.Preamble);
         var formatPath = isStandalone || !settings.UsePrecompiledFormats ? null : await GetPreviewFormatAsync(engine, engineName, effectivePreamble, flags).WaitAsync(cancellationToken);
@@ -190,6 +201,7 @@ internal static partial class TexPreviewRenderer
             return new TexPreviewResult(pdfPath, string.Empty, Rect.Empty, 0, compileLog, exitCode, userSourceStartLine);
 
         var boundingBox = ReadBoundingBox(bbPath);
+        if (!rasterize) return new TexPreviewResult(pdfPath, "", boundingBox, 0, compileLog, 0, userSourceStartLine);
         var rasterResult = await RasterizeAsync(pdfPath, boundingBox, requestedRasterDpi, cancellationToken);
         var combinedLog = compileLog + (string.IsNullOrWhiteSpace(rasterResult.Log) ? string.Empty : "\n" + rasterResult.Log);
         return new TexPreviewResult(

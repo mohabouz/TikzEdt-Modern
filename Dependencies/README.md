@@ -13,3 +13,8 @@ original TikzEdt applications or UI projects.
 The modern app builds these parser sources through a project reference. No
 legacy solution, prebuilt TikzParser DLL, or .NET Framework targeting pack is
 needed. Original project: https://github.com/mkantem/tikzedt
+
+Native WPF vector preview rendering uses the NuGet dependency
+`SharpVectors.Wpf` 1.8.6 (BSD-3-Clause), restored automatically.
+Its upstream and third-party notices are in `SharpVectors.LICENSE.txt`, also
+included in published application output. Upstream: https://github.com/ElinamLLC/SharpVectors
