@@ -618,7 +618,7 @@ namespace TikzEdt.Parser
                     i = 1;
                 }
 
-                if (t.GetChild(i).Type == simpletikzParser.IM_NUMBERUNIT && t.GetChild(i).Type == simpletikzParser.IM_NUMBERUNIT)
+                if (t.GetChild(i).Type == simpletikzParser.IM_NUMBERUNIT && t.GetChild(i + 1).Type == simpletikzParser.IM_NUMBERUNIT)
                 {
                     tc.uX = new Tikz_NumberUnit(t.GetChild(i));
                     tc.uY = new Tikz_NumberUnit(t.GetChild(i + 1));

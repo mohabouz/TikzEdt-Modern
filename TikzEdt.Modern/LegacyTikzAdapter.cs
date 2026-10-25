@@ -2,6 +2,7 @@ using System.Windows;
 using System.Text.RegularExpressions;
 using System.Windows.Media;
 using TikzEdt.Parser;
+using TikzEdt.Modern.Core.Documents;
 
 namespace TikzEdt.Modern;
 
@@ -35,9 +36,12 @@ internal static class LegacyTikzAdapter
         var result = new LegacyTikzDiagram();
         try
         {
-            var tree = TikzParser.Parse(source);
+            var prepared = OverlayCoordinateSource.Prepare(source);
+            var tree = TikzParser.Parse(prepared.Text);
             if (tree is null)
                 return result;
+
+            if (prepared.Text != source) RestoreCoordinateSource(tree, source, prepared.Coordinates);
 
             Visit(tree, result);
             var picture = Descendants(tree).OfType<Tikz_Picture>().FirstOrDefault();
@@ -72,8 +76,49 @@ internal static class LegacyTikzAdapter
         if (coordinate is null || !point.Item.GetAbsPos(out current) || !point.Item.parent.GetCurrentTransformAt(point.Item, out var transform)) return original;
         var originalCoordinate = coordinate.ToString();
         if (string.IsNullOrEmpty(originalCoordinate) && point.Item is Tikz_Node) originalCoordinate = Regex.Match(original, @"\bat\s*(?<coord>\([^()]*\))").Groups["coord"].Value;
-        var pair = Regex.Match(originalCoordinate, @"\(\s*(?<x>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?(?:cm|mm|pt|in|em|ex)?)(?<between>\s*[:,]\s*)(?<y>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?(?:cm|mm|pt|in|em|ex)?)\s*\)");
-        if (!pair.Success) { point.Item.SetAbsPos(absolutePosition); point.Item.UpdateText(); return point.Item.ToString(); }
+        var pair = Regex.Match(originalCoordinate, @"^\s*(?:\+\+?\s*)?\(\s*(?<x>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?(?:cm|mm|pt|in|em|ex)?)(?<between>\s*[:,]\s*)(?<y>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?(?:cm|mm|pt|in|em|ex)?)\s*\)\s*$");
+        if (!pair.Success)
+        {
+            var expression = OverlayCoordinateSource.Prepare(originalCoordinate).Coordinates.FirstOrDefault(c => c.Resolved);
+            if (expression is null) return original; // Never flatten an unknown formula into a guessed number.
+            var displacement = transform.Inverse().Transform(new Point(absolutePosition.X - current.X, absolutePosition.Y - current.Y), true);
+            var desiredExpression = coordinate.GetCartesian(); desiredExpression.Offset(displacement.X, displacement.Y);
+            double firstValue = desiredExpression.X, secondValue = desiredExpression.Y;
+            if (coordinate.type == Tikz_CoordType.Polar)
+            {
+                firstValue = Math.Atan2(desiredExpression.Y, desiredExpression.X) * 180 / Math.PI;
+                firstValue += 360 * Math.Round((coordinate.uX.number - firstValue) / 360);
+                secondValue = Math.Sqrt(desiredExpression.X * desiredExpression.X + desiredExpression.Y * desiredExpression.Y);
+            }
+            string Translate(string component, double oldValue, double nextValue)
+            {
+                var delta = nextValue - oldValue; if (Math.Abs(delta) < 1e-9) return component;
+                var inner = component.Trim();
+                var previous = Regex.Match(inner, @"^\{\((?<body>[\s\S]*)\)\+\((?<delta>[+-]?(?:\d+(?:\.\d*)?|\.\d+))\)\}$", RegexOptions.None, TimeSpan.FromMilliseconds(50));
+                if (previous.Success && double.TryParse(previous.Groups["delta"].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var priorDelta))
+                {
+                    inner = previous.Groups["body"].Value; delta += priorDelta;
+                    if (Math.Abs(delta) < 1e-9) return "{" + inner + "}";
+                }
+                while (inner.StartsWith('{') && inner.EndsWith('}'))
+                {
+                    var depth = 0; var enclosing = true;
+                    for (var i = 0; i < inner.Length - 1; i++) { if (inner[i] == '{') depth++; else if (inner[i] == '}' && --depth == 0) { enclosing = false; break; } }
+                    if (!enclosing) break; inner = inner[1..^1].Trim();
+                }
+                return "{(" + inner + ")+(" + delta.ToString("0.##########", System.Globalization.CultureInfo.InvariantCulture) + ")}";
+            }
+            var firstText = Translate(expression.First, expression.X, firstValue); var secondText = Translate(expression.Second, expression.Y, secondValue);
+            var replacement = originalCoordinate[..(expression.Offset + 1)] + firstText + expression.SeparatorKind + secondText + originalCoordinate[(expression.Offset + expression.Length - 1)..];
+            coordinate.uX.SetNumberWithPrecision(firstValue, 10); coordinate.uY.SetNumberWithPrecision(secondValue, 10); coordinate.text = replacement;
+            if (point.Item is Tikz_Node expressionNode)
+            {
+                var coordinateStart = original.IndexOf(originalCoordinate, StringComparison.Ordinal);
+                if (coordinateStart < 0) return original;
+                expressionNode.text = original[..coordinateStart] + replacement + original[(coordinateStart + originalCoordinate.Length)..];
+            }
+            return point.Item.ToString();
+        }
         var delta = transform.Inverse().Transform(new Point(absolutePosition.X - current.X, absolutePosition.Y - current.Y), true);
         var desired = coordinate.GetCartesian(); desired.Offset(delta.X, delta.Y);
         var first = desired.X; var second = desired.Y;
@@ -108,6 +153,34 @@ internal static class LegacyTikzAdapter
         return value.HasInverse ? new(value) : EditorCoordinateFrame.Identity;
     }
 
+    private static void RestoreCoordinateSource(TikzContainerParseItem tree, string source, IReadOnlyList<OverlayCoordinate> coordinates)
+    {
+        foreach (var item in Descendants(tree))
+        {
+            var offset = item.StartPosition(); var length = item.ToString().Length;
+            if (offset < 0 || offset + length > source.Length) continue;
+            var relevant = coordinates.FirstOrDefault(c => c.Offset >= offset && c.Offset + c.Length <= offset + length);
+            if (item is Tikz_Node)
+            {
+                var at = Regex.Match(source.Substring(offset, length), @"\bat\s*(?:\+\+?\s*)?\(");
+                relevant = at.Success ? coordinates.FirstOrDefault(c => c.Offset == offset + at.Index + at.Length - 1) : null;
+            }
+            var coordinate = item switch { Tikz_Coord coord => coord, Tikz_Node node => node.coord, Tikz_Option option => option.coordval, _ => null };
+            if (coordinate is not null && relevant is not null)
+            {
+                if (relevant.Resolved)
+                {
+                    coordinate.type = relevant.SeparatorKind == ':' ? Tikz_CoordType.Polar : Tikz_CoordType.Cartesian;
+                    coordinate.uX = new Tikz_NumberUnit(); coordinate.uX.SetNumberWithPrecision(relevant.X, 10);
+                    coordinate.uY = new Tikz_NumberUnit(); coordinate.uY.SetNumberWithPrecision(relevant.Y, 10);
+                }
+                else coordinate.type = Tikz_CoordType.Invalid;
+                if (item is not Tikz_Coord) coordinate.text = source.Substring(relevant.Offset, relevant.Length);
+            }
+            if (item is not TikzContainerParseItem) item.text = source.Substring(offset, length);
+        }
+    }
+
     private static void Visit(TikzParseItem item, LegacyTikzDiagram diagram)
     {
         if (item is Tikz_Path path)
@@ -120,7 +193,7 @@ internal static class LegacyTikzAdapter
                 .ToList();
 
             diagram.Points.AddRange(pathPoints);
-            if (!path.ToString().Contains(" grid", StringComparison.OrdinalIgnoreCase))
+            if (!path.ToString().Contains(" grid", StringComparison.OrdinalIgnoreCase) && !Regex.IsMatch(path.ToString(), @"\bplot\b"))
             {
                 var options = ExtractOptions(path.ToString());
                 for (var index = 1; index < pathPoints.Count; index++)

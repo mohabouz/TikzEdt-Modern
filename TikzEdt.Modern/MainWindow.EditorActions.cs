@@ -24,6 +24,9 @@ public partial class MainWindow
         var format = new MenuItem { Header = "Format Code", InputGestureText = "Ctrl+Shift+F", ToolTip = "Add structural line breaks and indent the selection, or the document when nothing is selected" };
         format.Click += FormatCode_Click;
         menu.Items.Add(format);
+        var image = new MenuItem { Header = "Import image asset…" }; image.Click += ImportImage_Click; menu.Items.Add(image);
+        var navigate = new MenuItem { Header = "Show in preview (SyncTeX)", InputGestureText = "Ctrl+Shift+J" }; navigate.Click += ShowInPreview_Click; menu.Items.Add(navigate);
+        var fixes = new MenuItem { Header = "Quick fixes…", InputGestureText = "Ctrl+." }; fixes.Click += QuickFix_Click; menu.Items.Add(fixes);
         var comment = new MenuItem { Header = "Toggle Line Comment", InputGestureText = "Ctrl+/" };
         comment.Click += (_, _) => ToggleSourceComment(); menu.Items.Add(comment);
         var column = new MenuItem { Header = "Extend Column Selection Down", InputGestureText = "Ctrl+Alt+↓", ToolTip = "Type to edit the same column on several lines; Alt+Shift+arrows or Alt+drag also work. Escape returns to one caret." };

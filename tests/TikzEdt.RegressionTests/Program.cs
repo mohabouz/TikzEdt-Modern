@@ -3,6 +3,31 @@ using System.IO;
 
 var renderer = typeof(TikzEdt.Modern.MainWindow).Assembly.GetType("TikzEdt.Modern.TexPreviewRenderer")!;
 var render = renderer.GetMethod("RenderAsync", BindingFlags.Public | BindingFlags.Static)!;
+if (args.Contains("--probe-fixture"))
+{
+    if (args.Contains("sleep")) await Task.Delay(30000);
+    if (args.Contains("flood")) Console.Write(new string('x', 100000));
+    Console.WriteLine("Fixture version 1.2.3");
+    if (args.Contains("broken")) Environment.ExitCode = 7;
+    return;
+}
+if (args.Contains("--toolchain-regression")) { await ToolchainRegression.RunAsync(); return; }
+if (args.Contains("--document-safety-regression")) { DocumentSafetyRegression.Run(); return; }
+if (args.Contains("--palette-regression")) { CommandPaletteRegression.Run(); return; }
+if (args.Contains("--user-snippets-regression")) { UserSnippetRegression.Run(); return; }
+if (args.Contains("--math-hover-regression")) { MathHoverRegression.Run(); return; }
+if (args.Contains("--symbol-regression")) { SymbolRegression.Run(); return; }
+if (args.Contains("--intelligence-regression")) { IntelligenceRegression.Run(); return; }
+if (args.Contains("--semantic-regression")) { SemanticRegression.Run(); return; }
+if (args.Contains("--synctex-regression")) { SyncTexRegression.Run(); return; }
+if (args.Contains("--synctex-integration")) { await SyncTexRegression.IntegrationAsync(); return; }
+if (args.Contains("--image-assets-regression")) { ImageAssetRegression.Run(); return; }
+if (args.Contains("--calculated-coordinates-regression")) { CalculatedCoordinateRegression.Run(); return; }
+if (args.Contains("--calculated-coordinates-integration")) { await CalculatedCoordinateRegression.IntegrationAsync(); return; }
+if (args.Contains("--editor-workflow-ui")) { EditorWorkflowUiRegression.Run(); return; }
+if (args.Contains("--image-assets-integration")) { await ImageAssetRegression.IntegrationAsync(); return; }
+if (args.Contains("--math-hover-integration")) { await MathHoverRegression.IntegrationAsync(); return; }
+if (args.Contains("--toolchain-installed")) { await ToolchainRegression.InstalledAsync(); return; }
 if (args.Contains("--chemfig-layout-regression")) { ChemfigLayoutRegression.Run(); return; }
 if (args.Contains("--labo-coverage-regression")) { LaboCoverageRegression.Run(); return; }
 if (args.Contains("--labo-coverage-integration")) { await LaboCoverageRegression.IntegrationAsync(); return; }

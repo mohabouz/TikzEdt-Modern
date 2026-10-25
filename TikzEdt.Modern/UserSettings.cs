@@ -13,6 +13,7 @@ public sealed class UserSettings
     public bool HighlightCurrentLine { get; set; } = true;
     public bool SyntaxHighlighting { get; set; } = true;
     public bool AutomaticCompletion { get; set; } = true;
+    public bool MathHoverPreview { get; set; } = true;
     public int TabSize { get; set; } = 4;
     public bool ConvertTabsToSpaces { get; set; } = true;
     public bool AutomaticPreview { get; set; } = true;

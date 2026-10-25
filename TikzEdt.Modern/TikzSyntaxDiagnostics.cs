@@ -6,6 +6,7 @@ internal static partial class TikzSyntaxDiagnostics
 {
     public static IReadOnlyList<EditorDiagnostic> Analyze(string source)
     {
+        source = TikzEdt.Modern.Core.Documents.TexKnowledge.Mask(source);
         var diagnostics = new List<EditorDiagnostic>();
         CheckDelimiters(source, diagnostics);
         CheckEnvironments(source, diagnostics);

@@ -72,6 +72,12 @@ public partial class SettingsDialog : Window
         if (ValidateForm()) EditorAppearance.Apply(FontPreview, (UserSettings)DataContext);
     }
 
+    private void ToolchainDoctor_Click(object sender, RoutedEventArgs e)
+    {
+        UpdateBindings(this);
+        new ToolchainDoctorWindow((UserSettings)DataContext) { Owner = this }.ShowDialog();
+    }
+
     private void Defaults_Click(object sender, RoutedEventArgs e)
     {
         DataContext = new UserSettings();

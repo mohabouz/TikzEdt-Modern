@@ -5,7 +5,11 @@ using System.Windows.Media;
 
 namespace TikzEdt.Modern;
 
-internal sealed record LatexSymbol(string Category, string Glyph, string Command);
+internal sealed record LatexSymbol(string Category, string Glyph, string Command)
+{
+    public string Meaning => SymbolSearch.Meaning(Command);
+    public string? Package => SymbolSearch.Package(Command);
+}
 internal static class LatexSymbolCatalog
 {
     public static IReadOnlyList<LatexSymbol> Items { get; } = Build();
@@ -46,22 +50,32 @@ internal sealed class LatexSymbolsPanel : DockPanel
     private readonly TextBox _search = new() { Margin = new Thickness(0, 0, 0, 6), Padding = new Thickness(6), ToolTip = "Search symbols or LaTeX commands" };
     private readonly ComboBox _category = new() { Margin = new Thickness(0, 0, 0, 6) };
     private readonly WrapPanel _items = new();
+    private readonly SymbolPreferences _preferences = SymbolPreferences.Load();
     public LatexSymbolsPanel()
     {
         Margin = new Thickness(6);
         var heading = new StackPanel(); SetDock(heading, Dock.Top); heading.Children.Add(_search); heading.Children.Add(_category); Children.Add(heading);
-        var help = new TextBlock { Text = "Click to insert. Math delimiters are added when needed. Some symbols require amssymb.", TextWrapping = TextWrapping.Wrap, FontSize = 11, Margin = new Thickness(0, 6, 0, 3) }; SetDock(help, Dock.Bottom); Children.Add(help);
+        var help = new TextBlock { Text = "Click to insert · right-click to favorite. Search by meaning or command; hover for package requirements.", TextWrapping = TextWrapping.Wrap, FontSize = 11, Margin = new Thickness(0, 6, 0, 3) }; SetDock(help, Dock.Bottom); Children.Add(help);
         Children.Add(new ScrollViewer { Content = _items, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
-        _category.ItemsSource = new[] { "All categories" }.Concat(LatexSymbolCatalog.Items.Select(item => item.Category).Distinct()).ToArray();
-        _search.TextChanged += (_, _) => Refresh(); _category.SelectionChanged += (_, _) => Refresh(); _category.SelectedIndex = 1;
+        _category.ItemsSource = new[] { "All categories", "Favorites", "Recent" }.Concat(LatexSymbolCatalog.Items.Select(item => item.Category).Distinct()).ToArray();
+        _search.MaxLength = 150;
+        _search.TextChanged += (_, _) => Refresh(); _category.SelectionChanged += (_, _) => Refresh(); _category.SelectedIndex = 0;
     }
     private void Refresh()
     {
         _items.Children.Clear();
-        foreach (var symbol in LatexSymbolCatalog.Items.Where(item => (_category.SelectedIndex == 0 || item.Category == _category.SelectedItem?.ToString()) && (item.Glyph + item.Command + item.Category).Contains(_search.Text, StringComparison.OrdinalIgnoreCase)))
+        var category = _category.SelectedItem?.ToString();
+        var candidates = LatexSymbolCatalog.Items.Where(item => category switch { "All categories" => true, "Favorites" => _preferences.Favorites.Contains(item.Command), "Recent" => _preferences.Recent.Contains(item.Command), _ => item.Category == category });
+        var matches = candidates.Select(s => (Symbol: s, Score: SymbolSearch.Score(_search.Text, s))).Where(s => s.Score >= 0).OrderByDescending(s => s.Score).ThenBy(s => category == "Recent" ? _preferences.Recent.IndexOf(s.Symbol.Command) : 0);
+        foreach (var match in matches)
         {
-            var button = new Button { Content = new TextBlock { Text = symbol.Glyph, FontFamily = new FontFamily("Cambria Math"), FontSize = 21, HorizontalAlignment = HorizontalAlignment.Center }, Width = 43, Height = 39, Padding = new Thickness(2), Margin = new Thickness(2), ToolTip = MainWindow.RichToolTip(symbol.Glyph, symbol.Command + "\n" + symbol.Category) };
-            button.Click += (_, _) => InsertRequested?.Invoke(symbol.Command); _items.Children.Add(button);
+            var symbol = match.Symbol;
+            var button = new Button { Content = new TextBlock { Text = symbol.Glyph, FontFamily = new FontFamily("Cambria Math"), FontSize = 21, HorizontalAlignment = HorizontalAlignment.Center }, Width = 43, Height = 39, Padding = new Thickness(2), Margin = new Thickness(2), ToolTip = MainWindow.RichToolTip(symbol.Glyph + (_preferences.Favorites.Contains(symbol.Command) ? " ★" : ""), symbol.Command + "\n" + symbol.Meaning + "\n" + (symbol.Package is { } package ? "Requires \\usepackage{" + package + "}" : "Standard LaTeX math")) };
+            button.Click += (_, _) => { InsertRequested?.Invoke(symbol.Command); _preferences.Record(symbol.Command); _preferences.Save(); if (category == "Recent") Refresh(); };
+            var menu = new ContextMenu(); var favorite = new MenuItem { Header = _preferences.Favorites.Contains(symbol.Command) ? "Remove favorite" : "Add favorite" };
+            favorite.Click += (_, _) => { if (!_preferences.Favorites.Remove(symbol.Command)) _preferences.Favorites.Add(symbol.Command); _preferences.Save(); Refresh(); }; menu.Items.Add(favorite); button.ContextMenu = menu;
+            _items.Children.Add(button);
         }
+        if (_items.Children.Count == 0) _items.Children.Add(new TextBlock { Text = "No matching symbols.", Margin = new Thickness(4) });
     }
 }

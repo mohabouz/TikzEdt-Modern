@@ -19,6 +19,12 @@ This is a development preview.
 
 - Chemfig molecule editing with compact flyout palettes, stereochemical bonds and lone pairs.
 - PST-Labo apparatus, editable liquid layers and attached tubing with vector previews.
+- Toolchain Doctor, safe save/recovery/history, command palette and linked-field user snippets.
+- Vector equation hover, symbol favorites/recents, package-aware completion and explicit quick fixes.
+- SyncTeX source/preview navigation and safe raster-image asset paste/drop.
+
+See [editor workflows and current limits](TikzEdt.Modern/EDITOR_WORKFLOWS.md) for
+shortcuts, storage locations and regression checks.
 
 Windows downloads are available in [GitHub Releases](https://github.com/mohabouz/TikzEdt-Modern/releases).
 

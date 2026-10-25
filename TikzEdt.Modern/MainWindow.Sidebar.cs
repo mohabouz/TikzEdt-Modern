@@ -83,11 +83,7 @@ public partial class MainWindow
         if (!ConfirmDiscardChanges()) return;
         try
         {
-            var source = File.ReadAllText(file.Path);
-            _filePath = file.Path;
-            Editor.Text = source;
-            _isDirty = false;
-            UpdateTitle();
+            OpenTrackedDocument(file.Path);
             ModeStatus.Text = "Opened " + file.Name;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)

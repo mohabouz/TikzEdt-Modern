@@ -2,6 +2,7 @@ using System.Windows.Media;
 using ICSharpCode.AvalonEdit.CodeCompletion;
 using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Editing;
+using TikzEdt.Modern.Core.Documents;
 
 namespace TikzEdt.Modern;
 
@@ -49,12 +50,15 @@ internal static class TikzCompletionProvider
         C("black", "black", "Built-in color", "Color"), C("white", "white", "Built-in color", "Color")
     ];
 
-    public static IReadOnlyList<TikzCompletionData> GetItems(string source, int caretOffset)
+    public static IReadOnlyList<TikzCompletionData> GetItems(string source, int caretOffset, TexIndex? index = null)
     {
-        var beforeCaret = source[..Math.Clamp(caretOffset, 0, source.Length)];
-        var lastOpenBracket = beforeCaret.LastIndexOf('[');
-        var lastCloseBracket = beforeCaret.LastIndexOf(']');
-        return lastOpenBracket > lastCloseBracket ? Options : Commands;
+        index ??= TexKnowledge.Build(source);
+        var context = TexKnowledge.Context(index, caretOffset);
+        var semantic = TexKnowledge.Complete(index, caretOffset);
+        var basic = semantic.Any(e => e.Kind == "Value") ? [] : context switch { "command" => Commands, "option" => Options, _ => Array.Empty<TikzCompletionData>() };
+        var labo = context == "command" ? LaboScene.Catalog.Where(d => !d.Command.Contains(':')).DistinctBy(d => d.Command).Select(d => C("\\" + d.Command, "\\" + d.Command + "[$0]", d.Title + " · Package: pst-labo", "Command"))
+            : context == "Labo option" ? LaboProperties.All.Where(p => !p.Key.StartsWith('$')).Select(p => C(p.Key + "=", p.Key + "=$0", p.Label + " · " + p.Group + " · Package: pst-labo", "Option")) : [];
+        return basic.Concat(semantic.Select(e => C(e.Name, e.Insertion, TexKnowledge.Describe(e), e.Kind, e.Kind.StartsWith("Local") ? 110 : 60))).Concat(labo).DistinctBy(e => e.Text).ToArray();
     }
 
     private static TikzCompletionData C(string text, string insertion, string description, string kind, double priority = 50) =>

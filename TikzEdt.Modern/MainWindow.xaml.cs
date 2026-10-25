@@ -112,6 +112,8 @@ public partial class MainWindow : Window
         InitializeSidebar();
         InitializeSnippetBuild();
         InitializeWorkspaceFeatures();
+        InitializeImageAssets();
+        GraphicalSurface.PreviewMouseDown += SyncTexCanvas_MouseDown;
         OverlayCanvas.LostMouseCapture += (_, _) => CancelCanvasInteraction();
         _overlayTimer.Tick += (_, _) => { _overlayTimer.Stop(); RenderWysiwyg(); };
         Editor.TextArea.Caret.PositionChanged += (_, _) => UpdateCoordinateContext();
@@ -131,7 +133,9 @@ public partial class MainWindow : Window
         Editor.TextArea.TextEntered += Editor_TextEntered;
         Editor.TextArea.TextEntering += Editor_TextEntering;
         Editor.TextArea.TextView.MouseHover += Editor_MouseHover;
-        Editor.TextArea.TextView.MouseHoverStopped += (_, _) => Editor.ToolTip = null;
+        Editor.TextArea.TextView.MouseHoverStopped += (_, _) => { Editor.ToolTip = null; CancelMathPreview(); };
+        Editor.TextChanged += (_, _) => { CancelMathPreview(); _syncJob?.Cancel(); CompiledPreviewLayer.Children.Remove(_syncHighlight); };
+        Closed += (_, _) => { CancelMathPreview(); _mathPreviewJob?.Dispose(); _indexJob?.Cancel(); _indexJob?.Dispose(); _syncJob?.Cancel(); _syncJob?.Dispose(); };
         SourceInitialized += (_, _) =>
         {
             _windowSource = PresentationSource.FromVisual(this) as HwndSource;
@@ -194,6 +198,7 @@ public partial class MainWindow : Window
             Dispatcher.BeginInvoke(CenterGraphicalViewport, DispatcherPriority.Loaded);
             if (SettingsStore.Current.AutomaticPreview) _previewTimer.Start();
         };
+        InitializeDocumentSafety();
     }
 
     private void LoadSyntaxHighlighting()
@@ -224,13 +229,25 @@ public partial class MainWindow : Window
             _completionWindow.Close();
     }
 
-    private void ShowCompletion()
+    private int _completionRequest;
+    private async void ShowCompletion()
     {
+        var request = ++_completionRequest;
         _completionWindow?.Close();
         var caretOffset = Editor.CaretOffset;
-        var startOffset = FindCompletionStartOffset(Editor.Text, caretOffset);
-        var items = TikzCompletionProvider.GetItems(Editor.Text, caretOffset);
-        if (items.Count == 0)
+        var source = Editor.Text;
+        var index = await RefreshTexIndexAsync(source);
+        if (request != _completionRequest || index is null || source != Editor.Text || caretOffset != Editor.CaretOffset) return;
+        var startOffset = CompletionStart(source, caretOffset, index);
+        var items = TikzCompletionProvider.GetItems(source, caretOffset, index);
+        var completionItems = items.Cast<ICompletionData>().ToList();
+        if (_snippetContext is null && TikzEdt.Modern.Core.Documents.TexKnowledge.Context(index, caretOffset) == "command")
+        {
+            var math = LatexSymbolCatalog.IsMathContext(source, caretOffset);
+            foreach (var snippet in ReadUserSnippets().Items.Where(s => s.Context == "any" || s.Context == (math ? "math" : "text")).DistinctBy(s => s.Prefix))
+                completionItems.Add(new UserSnippetCompletion(snippet, segment => InsertUserSnippet(snippet, segment.Offset, segment.Length)));
+        }
+        if (completionItems.Count == 0)
             return;
 
         var window = new CompletionWindow(Editor.TextArea)
@@ -246,7 +263,7 @@ public partial class MainWindow : Window
         window.CompletionList.ListBox.Background = window.Background;
         window.CompletionList.ListBox.Foreground = new SolidColorBrush(Color.FromRgb(223, 225, 229));
         window.CompletionList.ListBox.BorderThickness = new Thickness(0);
-        foreach (var item in items.OrderByDescending(item => item.Priority).ThenBy(item => item.Text))
+        foreach (var item in completionItems.OrderByDescending(item => item.Priority).ThenBy(item => item.Text))
             window.CompletionList.CompletionData.Add(item);
 
         _completionWindow = window;
@@ -262,6 +279,20 @@ public partial class MainWindow : Window
             window.CompletionList.SelectItem(prefix);
     }
 
+    internal static int CompletionStart(string source, int caretOffset, TikzEdt.Modern.Core.Documents.TexIndex index)
+    {
+        caretOffset = Math.Clamp(caretOffset, 0, source.Length);
+        var context = TikzEdt.Modern.Core.Documents.TexKnowledge.Context(index, caretOffset);
+        var prefix = source[..caretOffset];
+        if (context is "library" or "package" or "option" or "Chemfig option" or "Labo option")
+        {
+            var start = context is "library" or "package" ? Math.Max(prefix.LastIndexOf('{'), prefix.LastIndexOf(',')) + 1 : Math.Max(prefix.LastIndexOf('['), Math.Max(prefix.LastIndexOf(','), prefix.LastIndexOf('='))) + 1;
+            while (start < caretOffset && char.IsWhiteSpace(source[start])) start++;
+            if (start <= caretOffset && !source[start..caretOffset].Contains('\\') && !source[start..caretOffset].Contains('{')) return start;
+        }
+        var environment = Regex.Match(prefix, @"\\(?:begin|end)\{[a-zA-Z*]*$", RegexOptions.None, TimeSpan.FromMilliseconds(100));
+        return environment.Success ? environment.Index : FindCompletionStartOffset(source, caretOffset);
+    }
     private static int FindCompletionStartOffset(string source, int caretOffset)
     {
         var offset = Math.Clamp(caretOffset, 0, source.Length);
@@ -286,8 +317,12 @@ public partial class MainWindow : Window
         try
         {
             if (generation != _syntaxGeneration || source != Editor.Text) return;
-            diagnostics = await Task.Run(() => TikzSyntaxDiagnostics.Analyze(source));
+            var index = await RefreshTexIndexAsync(source);
+            var result = await Task.Run(() => (Syntax: TikzSyntaxDiagnostics.Analyze(source), Semantic: index is null ? Array.Empty<TikzEdt.Modern.Core.Documents.TexIssue>() : TikzEdt.Modern.Core.Documents.TexSemantics.Analyze(index).ToArray()));
+            diagnostics = result.Syntax.Concat(result.Semantic.Select(i => TikzSyntaxDiagnostics.Create(source, i.Offset, i.Length, i.Message + (i.Fix is null ? "" : " · Ctrl+.: quick fixes"), "Semantic", EditorDiagnosticSeverity.Warning))).ToArray();
+            if (generation == _syntaxGeneration && source == Editor.Text) { _semanticIssues = result.Semantic; _semanticSource = source; }
         }
+        catch (RegexMatchTimeoutException) { return; }
         finally { _syntaxWorker.Release(); }
         if (generation != _syntaxGeneration || source != Editor.Text) return;
         _syntaxDiagnostics.Clear();
@@ -309,7 +344,7 @@ public partial class MainWindow : Window
         ProblemsTab.Header = $"Problems  {diagnostics.Length}";
     }
 
-    private void Editor_MouseHover(object sender, MouseEventArgs e)
+    private async void Editor_MouseHover(object sender, MouseEventArgs e)
     {
         if (_diagnosticRenderer is null)
             return;
@@ -318,9 +353,16 @@ public partial class MainWindow : Window
             return;
         var offset = Editor.Document.GetOffset(position.Value.Location);
         var diagnostic = _diagnosticRenderer.GetDiagnosticAt(offset);
+        CancelMathPreview();
         Editor.ToolTip = diagnostic is null
             ? null
             : $"{diagnostic.Source}: {diagnostic.Message}\n{diagnostic.Location}";
+        if (diagnostic is null)
+        {
+            var help = _texIndex?.Source == Editor.Text ? TikzEdt.Modern.Core.Documents.TexKnowledge.Hover(_texIndex, offset) : null;
+            if (help is not null) Editor.ToolTip = help;
+            else await ShowMathPreviewAsync(offset);
+        }
     }
 
     private void ProblemsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -350,6 +392,7 @@ public partial class MainWindow : Window
         _filePath = null;
         Editor.Text = "\\begin{tikzpicture}\n    \n\\end{tikzpicture}";
         _isDirty = false;
+        TrackOpenedDocument();
         UpdateTitle();
     }
 
@@ -366,11 +409,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) != true)
             return;
 
-        _filePath = dialog.FileName;
-        Editor.Text = File.ReadAllText(_filePath);
-        _isDirty = false;
-        UpdateTitle();
-        ModeStatus.Text = $"Opened {_filePath}";
+        try { OpenTrackedDocument(dialog.FileName); ModeStatus.Text = $"Opened {_filePath}"; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { ModeStatus.Text = error.Message; }
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
@@ -385,6 +425,7 @@ public partial class MainWindow : Window
 
     private bool SaveDocument(bool saveAs)
     {
+        var destination = _filePath;
         if (saveAs || _filePath is null)
         {
             var dialog = new SaveFileDialog
@@ -396,14 +437,20 @@ public partial class MainWindow : Window
             };
             if (dialog.ShowDialog(this) != true)
                 return false;
-            _filePath = dialog.FileName;
+            destination = dialog.FileName;
         }
-
-        File.WriteAllText(_filePath, Editor.Text, new UTF8Encoding(false));
-        _isDirty = false;
-        UpdateTitle();
-        ModeStatus.Text = $"Saved {_filePath}";
-        return true;
+        try
+        {
+            var expected = destination == _filePath ? _diskFingerprint : TikzEdt.Modern.Core.Documents.DocumentSafetyStore.Fingerprint(destination!);
+            try { SaveTrackedDocument(destination!, expected); }
+            catch (TikzEdt.Modern.Core.Documents.DocumentConflictException)
+            {
+                if (MessageBox.Show(this, "The file changed outside TikzEdt. Overwrite it after keeping a local history copy of the external version? Choose No to keep editing without overwriting.", "External file change", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return false;
+                SaveTrackedDocument(destination!, expected, true);
+            }
+            return true;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { ModeStatus.Text = "Save failed: " + error.Message; return false; }
     }
 
     private bool ConfirmDiscardChanges()
@@ -508,6 +555,8 @@ public partial class MainWindow : Window
             {
                 _lastPreviewKey = previewKey;
                 _lastPreviewPath = result.PdfPath;
+                _syncSource = source;
+                _syncLines = CreateSyncLineMap(source, result.UserSourceStartLine);
                 _lastPreviewPngPath = null;
                 _lastPreviewBoundingBox = result.BoundingBox;
                 _compiledBitmap = null;
@@ -783,6 +832,11 @@ public partial class MainWindow : Window
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.K && Keyboard.Modifiers == ModifierKeys.Control) { CommandPalette_Click(sender, e); e.Handled = true; return; }
+        if (e.Key == Key.J && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)) { ShowInPreview_Click(sender, e); e.Handled = true; return; }
+        if (e.Key == Key.OemPeriod && Keyboard.Modifiers == ModifierKeys.Control) { QuickFix_Click(sender, e); e.Handled = true; return; }
+        if (e.Key == Key.Tab && Keyboard.Modifiers == ModifierKeys.None && Editor.IsKeyboardFocusWithin && TryExpandUserSnippet()) { e.Handled = true; return; }
+        if (e.Key == Key.Escape) CancelMathPreview();
         if (Editor.IsKeyboardFocusWithin && HandleSourceEditorKey(e.Key, Keyboard.Modifiers)) { e.Handled = true; return; }
         if (HandleWorkspaceShortcut(e)) return;
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Space && Editor.IsKeyboardFocusWithin)

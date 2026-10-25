@@ -48,6 +48,7 @@
                     <CheckBox Style="{StaticResource Option}" Content="Highlight current line" IsChecked="{Binding HighlightCurrentLine}"/>
                     <CheckBox Style="{StaticResource Option}" Content="Syntax highlighting" IsChecked="{Binding SyntaxHighlighting}"/>
                     <CheckBox Style="{StaticResource Option}" Content="Show completion while typing (Ctrl+Space remains available)" IsChecked="{Binding AutomaticCompletion}"/>
+                    <CheckBox Style="{StaticResource Option}" Content="Preview mathematics on hover (uses TeX; shell escape disabled)" IsChecked="{Binding MathHoverPreview}"/>
                     <CheckBox Style="{StaticResource Option}" Content="Convert tabs to spaces" IsChecked="{Binding ConvertTabsToSpaces}"/>
                     <TextBlock Text="Tab size" Margin="0,8,0,0"/><TextBox Style="{StaticResource Field}" Text="{Binding TabSize}"/>
                 </StackPanel></ScrollViewer>
@@ -60,6 +61,7 @@
                     <TextBlock Text="pdfLaTeX executable"/><TextBox Style="{StaticResource Field}" Text="{Binding PdfLatexPath}"/>
                     <TextBlock Text="LuaLaTeX executable"/><TextBox Style="{StaticResource Field}" Text="{Binding LuaLatexPath}"/>
                     <TextBlock Text="XeLaTeX executable"/><TextBox Style="{StaticResource Field}" Text="{Binding XeLatexPath}"/>
+                    <Button Content="Toolchain Doctor…" Click="ToolchainDoctor_Click" ToolTip="Read-only executable and package checks using the paths entered above"/>
                     <TextBlock Text="Additional compiler flags"/><TextBox Style="{StaticResource Field}" Text="{Binding CompilerFlags}"/>
                     <TextBlock Text="For example: -synctex=1 -shell-escape. Quote values containing spaces. Preview output paths, format and interaction mode are managed by TikzEdt." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
                     <TextBlock Text="Compilation timeout (seconds)"/><TextBox Style="{StaticResource Field}" Text="{Binding CompilerTimeoutSeconds}"/>

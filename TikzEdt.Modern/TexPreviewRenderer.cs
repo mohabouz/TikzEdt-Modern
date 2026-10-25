@@ -397,12 +397,18 @@ internal static partial class TexPreviewRenderer
         return (process.ExitCode, await stdout + await stderr);
     }
 
+    internal static int BoundingBoxWriterLineCount => BoundingBoxWriter.Count(c => c == '\n');
+    internal static int BoundingBoxInsertionOffset(string source)
+    {
+        var match = EndTikzPictureRegex().Match(TikzEdt.Modern.Core.Documents.TexKnowledge.Mask(source));
+        return match.Success ? match.Index : -1;
+    }
     private static string InjectBoundingBoxWriter(string source)
     {
-        var match = EndTikzPictureRegex().Match(source);
-        if (!match.Success)
+        var offset = BoundingBoxInsertionOffset(source);
+        if (offset < 0)
             return source;
-        return source.Insert(match.Index, BoundingBoxWriter);
+        return source.Insert(offset, BoundingBoxWriter);
     }
 
     private static (string Source, string Preamble) PrepareFragment(string source)
@@ -431,7 +437,7 @@ internal static partial class TexPreviewRenderer
     [GeneratedRegex(@"\\begin\s*\{\s*(?:tikzpicture|circuitikz)\s*\}", RegexOptions.IgnoreCase)]
     private static partial Regex BeginPictureRegex();
 
-    [GeneratedRegex(@"(?<!\\)\\usetikzlibrary\s*\{[^{}]*\}")]
+    [GeneratedRegex(@"(?<!\\)\\(?:usetikzlibrary\s*\{[^{}]*\}|usepackage\s*(?:\[[^\]]*\]\s*)?\{[^{}]*\})")]
     private static partial Regex LibraryDeclarationRegex();
 
     private static bool IsStandalone(string source) =>
