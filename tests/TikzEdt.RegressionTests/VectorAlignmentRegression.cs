@@ -15,7 +15,10 @@ internal static class VectorAlignmentRegression
             ("origin", "\\begin{tikzpicture}\n\\draw[blue,thick] (0,0) rectangle (4,2);\n\\node at (2,1) {TikzEdt Modern: $\\displaystyle E=m\\cdot c^2$};\n\\end{tikzpicture}", new Rect(0,0,4,2)),
             ("negative", "\\begin{tikzpicture}\\draw[blue,thick] (-3,-2) rectangle (1,0);\\end{tikzpicture}", new Rect(-3,-2,4,2)),
             ("scale-and-scope", "\\begin{tikzpicture}[scale=1.7]\\begin{scope}[shift={(.3,-.2)}]\\draw[blue,thick] (0,0) rectangle (4,2);\\end{scope}\\end{tikzpicture}", new Rect(.51,-.34,6.8,3.4)),
-            ("point-units", "\\begin{tikzpicture}\\draw[blue,thick] (0pt,0pt) rectangle (72.27pt,36.135pt);\\end{tikzpicture}", new Rect(0,0,2.54,1.27))
+            ("point-units", "\\begin{tikzpicture}\\draw[blue,thick] (0pt,0pt) rectangle (72.27pt,36.135pt);\\end{tikzpicture}", new Rect(0,0,2.54,1.27)),
+            ("xy-units", @"\begin{tikzpicture}[x=2cm,y=5mm]\draw[blue,thick] (0,0) rectangle (4,2);\end{tikzpicture}", new Rect(0,0,8,1)),
+            ("xy-explicit-units", @"\begin{tikzpicture}[x=2cm,y=5mm,scale=1.5]\draw[blue,thick] (0cm,0cm) rectangle (4cm,2cm);\end{tikzpicture}", new Rect(0,0,6,3)),
+            ("xy-scope-override", @"\begin{tikzpicture}[x=2cm,y=5mm]\begin{scope}[x=3cm,shift={(1,2)}]\draw[blue,thick] (0,0) rectangle (2,2);\end{scope}\end{tikzpicture}", new Rect(3,1,6,1))
           })
           {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(90));
@@ -29,6 +32,9 @@ internal static class VectorAlignmentRegression
             // fraction of a canvas pixel, rather than hiding a scale/offset error.
             var error = new[] { Math.Abs(actual.Left - expected.Left), Math.Abs(actual.Top - expected.Top), Math.Abs(actual.Right - expected.Right), Math.Abs(actual.Bottom - expected.Bottom) }.Max();
             if (error > .0003) throw new Exception($"{engine}/{name}: vector border does not coincide with editing coordinates. Expected {expected}; actual {actual}; max error={error} cm.");
+            var markers = LegacyTikzAdapter.Parse(source).Points.Take(2).ToArray();
+            if (markers.Length != 2 || (markers[0].Position - expected.TopLeft).Length > 1e-6 || (markers[1].Position - expected.BottomRight).Length > 1e-6)
+                throw new Exception(engine + "/" + name + ": parsed control markers disagree with the TeX rectangle.");
             Console.WriteLine($"{engine}/{name}: maximum border/marker mismatch {error * 50:0.0000} canvas pixels at 100%.");
             if (name == "origin") Snapshot(result.Image, bb, expected, engine);
           }

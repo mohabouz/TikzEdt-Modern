@@ -23,6 +23,7 @@ if (args.Contains("--synctex-regression")) { SyncTexRegression.Run(); return; }
 if (args.Contains("--synctex-integration")) { await SyncTexRegression.IntegrationAsync(); return; }
 if (args.Contains("--image-assets-regression")) { ImageAssetRegression.Run(); return; }
 if (args.Contains("--calculated-coordinates-regression")) { CalculatedCoordinateRegression.Run(); return; }
+if (args.Contains("--coordinate-units-regression")) { CoordinateUnitsRegression.Run(); return; }
 if (args.Contains("--calculated-coordinates-integration")) { await CalculatedCoordinateRegression.IntegrationAsync(); return; }
 if (args.Contains("--editor-workflow-ui")) { EditorWorkflowUiRegression.Run(); return; }
 if (args.Contains("--image-assets-integration")) { await ImageAssetRegression.IntegrationAsync(); return; }

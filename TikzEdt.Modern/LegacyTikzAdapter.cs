@@ -73,7 +73,7 @@ internal static class LegacyTikzAdapter
             Tikz_Node nodeItem => nodeItem.coord,
             _ => null
         };
-        if (coordinate is null || !point.Item.GetAbsPos(out current) || !point.Item.parent.GetCurrentTransformAt(point.Item, out var transform)) return original;
+        if (coordinate is null || !point.Item.GetAbsPos(out current) || !point.Item.parent.GetCoordinateTransformAt(point.Item, coordinate, out var transform)) return original;
         var originalCoordinate = coordinate.ToString();
         if (string.IsNullOrEmpty(originalCoordinate) && point.Item is Tikz_Node) originalCoordinate = Regex.Match(original, @"\bat\s*(?<coord>\([^()]*\))").Groups["coord"].Value;
         var pair = Regex.Match(originalCoordinate, @"^\s*(?:\+\+?\s*)?\(\s*(?<x>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?(?:cm|mm|pt|in|em|ex)?)(?<between>\s*[:,]\s*)(?<y>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?(?:cm|mm|pt|in|em|ex)?)\s*\)\s*$");

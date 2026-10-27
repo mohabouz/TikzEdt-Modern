@@ -5,8 +5,8 @@
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.5.0-preview</Version>
-    <InformationalVersion>0.5.0-preview</InformationalVersion>
+    <Version>0.5.1-preview</Version>
+    <InformationalVersion>0.5.1-preview</InformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\Branding\TikzEdt.ico</ApplicationIcon>
   </PropertyGroup>

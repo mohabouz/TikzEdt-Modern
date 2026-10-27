@@ -842,7 +842,7 @@ namespace TikzEdt.Parser
                     if (relto.parent != null)
                     {
                         TikzMatrix M;
-                        if (!relto.parent.GetCurrentTransformAt(relto, out M))
+                        if (!relto.parent.GetCoordinateTransformAt(relto, this, out M))
                         {
                             ret = new Point(0, 0);
                             return false;
@@ -880,7 +880,7 @@ namespace TikzEdt.Parser
                 else
                 {
                     TikzMatrix M;
-                    if (!relto.parent.GetCurrentTransformAt(relto, out M))
+                    if (!relto.parent.GetCoordinateTransformAt(relto, this, out M))
                     {
                         ret = new Point(0, 0);
                         return false;
@@ -1252,13 +1252,40 @@ namespace TikzEdt.Parser
         /// <returns>The coordinate transformation.</returns>
         public bool GetCurrentTransformAt(TikzParseItem childtpi, out TikzMatrix M)
         {
-            if (parent != null)
+            TikzMatrix canvas, basis;
+            var valid = GetTransformStateAt(childtpi, out canvas, out basis);
+            M = canvas * basis;
+            return valid;
+        }
+
+        // TikZ's x/y vectors are coordinate units, not canvas transforms. A
+        // nested x= replaces the inherited vector; explicit dimensions bypass
+        // that vector, while scale/rotate still apply to both kinds of input.
+        public bool GetCoordinateTransformAt(TikzParseItem child, Tikz_Coord coordinate, out TikzMatrix M)
+        {
+            TikzMatrix canvas, basis;
+            var valid = GetTransformStateAt(child, out canvas, out basis);
+            if (coordinate.type == Tikz_CoordType.Polar)
             {
-                if (!parent.GetCurrentTransformAt(this, out M))
-                    return false;
+                if (coordinate.uY.unit != "") basis = new TikzMatrix();
             }
             else
-                M = new TikzMatrix(); // identity matrix
+            {
+                if (coordinate.uX.unit != "") { basis.m[0, 0] = 1; basis.m[1, 0] = 0; }
+                if (coordinate.uY.unit != "") { basis.m[0, 1] = 0; basis.m[1, 1] = 1; }
+            }
+            M = canvas * basis;
+            return valid;
+        }
+
+        private bool GetTransformStateAt(TikzParseItem childtpi, out TikzMatrix M, out TikzMatrix basis)
+        {
+            M = new TikzMatrix(); basis = new TikzMatrix();
+            if (parent != null)
+            {
+                if (!parent.GetTransformStateAt(this, out M, out basis))
+                    return false;
+            }
 
             foreach (TikzParseItem tpi in Children)
             {
@@ -1268,11 +1295,40 @@ namespace TikzEdt.Parser
                 }
                 else if (tpi is Tikz_Options)
                 {
-                    TikzMatrix MM;
-                    if ((tpi as Tikz_Options).GetTransform(out MM))
-                        M = M * MM;
-                    else
-                        return false;
+                    var options = (Tikz_Options)tpi;
+                    foreach (var option in options.Children.OfType<Tikz_Option>())
+                    {
+                        var key = option.key.Trim();
+                        if (option.type == Tikz_OptionType.keyval && (key == "x" || key == "y"))
+                        {
+                            Point vector;
+                            if (option.numval != null)
+                                vector = key == "x" ? new Point(option.numval.GetInCM("pt"), 0) : new Point(0, option.numval.GetInCM("pt"));
+                            else if (option.coordval != null && (option.coordval.type == Tikz_CoordType.Cartesian || option.coordval.type == Tikz_CoordType.Polar))
+                                vector = option.coordval.GetCartesian();
+                            else return false; // Unknown units must not produce guessed marker positions.
+                            var column = key == "x" ? 0 : 1;
+                            basis.m[0, column] = vector.X; basis.m[1, column] = vector.Y;
+                        }
+                        else if (key == "shift" && option.coordval != null &&
+                            (option.coordval.type == Tikz_CoordType.Cartesian || option.coordval.type == Tikz_CoordType.Polar))
+                        {
+                            var coord = option.coordval;
+                            var units = new TikzMatrix();
+                            // GetCoordinateTransformAt would recurse into this option.
+                            for (var row = 0; row < 2; row++) for (var col = 0; col < 2; col++) units.m[row, col] = basis.m[row, col];
+                            if (coord.type == Tikz_CoordType.Polar && coord.uY.unit != "") units = new TikzMatrix();
+                            else if (coord.type == Tikz_CoordType.Cartesian)
+                            {
+                                if (coord.uX.unit != "") { units.m[0, 0] = 1; units.m[1, 0] = 0; }
+                                if (coord.uY.unit != "") { units.m[0, 1] = 0; units.m[1, 1] = 1; }
+                            }
+                            var shift = units.Transform(coord.GetCartesian(), true);
+                            var translation = new TikzMatrix(); translation.m[0, 2] = shift.X; translation.m[1, 2] = shift.Y;
+                            M = M * translation;
+                        }
+                        else if (!options.TransformFromOption(option, M, out M)) return false;
+                    }
                 }
             }
             return true;
@@ -1911,7 +1967,7 @@ namespace TikzEdt.Parser
         /// <param name="oldTrafo"></param>
         /// <param name="newTrafo"></param>
         /// <returns></returns>
-        bool TransformFromOption(Tikz_Option to, TikzMatrix oldTrafo, out TikzMatrix newTrafo)
+        internal bool TransformFromOption(Tikz_Option to, TikzMatrix oldTrafo, out TikzMatrix newTrafo)
         {
             TikzMatrix ret = new TikzMatrix();
             newTrafo = ret;
